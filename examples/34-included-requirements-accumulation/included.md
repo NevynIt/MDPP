@@ -1,5 +1,3 @@
----
-requirements:
-  - included-req
----
-Included requirements.
+[md:require]: math.latex
+
+## Included Requirement

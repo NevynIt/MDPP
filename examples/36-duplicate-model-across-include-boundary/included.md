@@ -1,2 +1,5 @@
-[md:model]
-name: example
+```dot model=system
+digraph G {
+  Included -> Model
+}
+```

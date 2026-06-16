@@ -1,1 +1,3 @@
-[md:include]: ./nested/child.md
+# Parent Include
+
+[md:include]: ./nested/details.md

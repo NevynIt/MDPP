@@ -1,2 +1,17 @@
-[diagram.dot.render]
-icon: https://example.com/icons/db.svg
+[md:profile]: md++
+[md:profile-version]: 0.14
+[md:require]: model.dot
+[md:require]: diagram.dot.render
+
+# Plugin Resource Denied
+
+```dot model=system-graph
+digraph G {
+  Internal -> Service
+}
+```
+
+```diagram.dot.render source=system-graph
+icon: https://example.invalid/private/db.svg
+caption: Host policy should deny this request
+```

@@ -1,3 +1,6 @@
+[md:profile]: md++
+[md:profile-version]: 0.14
 [md:repository:shared]: ./shared-one
 [md:repository:shared]: ./shared-two
-[md:include]: shared:chapter.md
+
+# Duplicate Repository Different Target
