@@ -1,0 +1,9 @@
+[md:require]: syntax-highlighting
+
+```go
+fmt.Println("known")
+```
+
+```madeuplang
+fallback
+```

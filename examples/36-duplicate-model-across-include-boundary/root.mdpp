@@ -1,0 +1,4 @@
+[md:model]
+name: example
+
+[md:include]: ./included.md

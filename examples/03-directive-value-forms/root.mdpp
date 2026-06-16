@@ -1,0 +1,12 @@
+[md:profile]: md++
+[md:profile-version]: 0.14
+[md:title]: <Directive Value Forms>
+[md:require]: diagram.mermaid ">=10 <11"
+[md:include]: <./sections/overview with spaces.md>
+[md:stylesheet]: ./styles/base.css
+
+[md:include]: ./path/with-trailing.md trailing
+[md:title]: <bad < angle>
+[md:require]: diagram.mermaid ">=10 <11" "extra title"
+
+# Directive Value Forms

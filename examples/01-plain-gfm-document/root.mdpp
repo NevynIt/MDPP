@@ -1,0 +1,21 @@
+# Plain GFM Document
+
+Paragraph with **strong** text, *emphasis*, a [link](https://example.org), and a local image.
+
+![Example image](image.svg)
+
+- alpha
+- beta
+
+1. one
+2. two
+
+> A quoted line.
+
+| Name | Value |
+|---|---|
+| left | right |
+
+```text
+plain code
+```

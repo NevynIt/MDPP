@@ -1,0 +1,5 @@
+---
+requirements:
+  - root-req
+---
+[md:include]: ./included.md

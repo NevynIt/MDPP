@@ -1,0 +1,6 @@
+[md:require]: capability
+[md:require]: capability@10
+[md:require]: capability@^10
+[md:require]: capability ">=10 <11"
+[md:require]: capability@10
+[md:require]: capability ">=10 <11"

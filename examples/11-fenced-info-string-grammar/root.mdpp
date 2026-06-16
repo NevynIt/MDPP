@@ -1,0 +1,7 @@
+```js key=value flag
+code
+```
+
+```python key="quoted value" other='quoted value'
+code
+```

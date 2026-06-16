@@ -1,0 +1,7 @@
+```js key="unterminated
+code
+```
+
+```js bad@attr
+code
+```

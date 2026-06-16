@@ -1,0 +1,3 @@
+[md:repository:shared]: ./shared-one
+[md:repository:shared]: ./shared-two
+[md:include]: shared:chapter.md

@@ -1,0 +1,8 @@
+[md:require]: math.latex
+[md:stylesheet]: a.css
+[md:theme]: base.mdpp
+[md:require]: diagram.mermaid
+[md:stylesheet]: b.css
+[md:theme]: override.mdpp
+
+Repeated directives should preserve source order.
