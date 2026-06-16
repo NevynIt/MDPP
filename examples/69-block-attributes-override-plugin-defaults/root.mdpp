@@ -1,0 +1,17 @@
+[md:profile]: md++
+[md:profile-version]: 0.14
+[md:theme]: ./theme.mdpp
+[md:require]: model.dot
+[md:require]: diagram.dot.render
+
+# Block Attributes Override Plugin Defaults
+
+```dot model=system-graph
+digraph G {
+  A -> B
+}
+```
+
+```diagram.dot.render source=system-graph caption-position=top
+caption: Block override example
+```

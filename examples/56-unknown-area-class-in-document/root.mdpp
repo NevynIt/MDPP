@@ -1,0 +1,15 @@
+[md:profile]: md++
+[md:profile-version]: 0.14
+[md:layout]: ./layout.mdpp
+
+# Unknown Area Class In Document
+
+## Page {.layout-single}
+
+### Known {.body}
+
+This section targets a valid area.
+
+### Unknown {.right}
+
+This section targets an area that the layout does not define.

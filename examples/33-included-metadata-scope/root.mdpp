@@ -1,2 +1,6 @@
+[md:profile]: md++
+[md:profile-version]: 0.14
 [md:title]: <Root Title>
-[md:include]: ./child.md
+[md:include]: ./included.md
+
+# Included Metadata Scope

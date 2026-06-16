@@ -1,0 +1,7 @@
+[md:profile]: md++
+[md:profile-version]: 0.14
+[md:theme]: ./theme.mdpp
+[md:layout]: ./document-layout.mdpp
+[md:stylesheet]: ./document.css
+
+# Document Overrides Theme Layout Style

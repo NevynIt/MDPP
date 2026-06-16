@@ -1,11 +1,17 @@
 [md:profile]: md++
 [md:profile-version]: 0.14
+[md:theme]: ./theme.mdpp
 [md:require]: model.dot
 [md:require]: diagram.dot.render
-[md:include]: ./models.md
 
-# Included Model Availability
+# Plugin Defaults From Theme
+
+```dot model=system-graph
+digraph G {
+  A -> B
+}
+```
 
 ```diagram.dot.render source=system-graph
-caption: Included graph
+caption: Theme defaults example
 ```
