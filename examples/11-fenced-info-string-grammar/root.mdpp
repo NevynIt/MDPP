@@ -3,10 +3,10 @@
 
 # Fenced Info String Grammar
 
-```text key=value mode="quoted value" label='single quoted value' enabled
+```text key=value mode="quoted value" label="second quoted value" enabled
 sample
 ```
 
-```diagram.dot.render source=system-graph caption-position=bottom theme="compact print" bordered
+```custom.block source=system-graph caption-position=bottom theme="compact print" bordered
 caption: Valid info string ordering
 ```

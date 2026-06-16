@@ -6,7 +6,6 @@
 
 ```dot model=bad
 digraph G {
-  A -> B
-  broken
+  A -> ;
 }
 ```

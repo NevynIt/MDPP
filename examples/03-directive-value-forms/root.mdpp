@@ -1,8 +1,10 @@
 [md:profile]: md++
 [md:stylesheet]: styles/main.css
 [md:theme]: <themes/dark mode.mdpp>
-[md:require]: diagram.dot.render '>=0.14 <0.15'
+[md:require]: diagram.dot.render ">=0.14 <0.15"
+
+# Directive Value Forms
 
 [md:theme]: <themes/broken.mdpp
-[md:stylesheet]: styles/extra.css 'unexpected title'
-[md:require]: diagram.dot.render '>=0.14' trailing
+[md:stylesheet]: styles/extra.css "first title" "second title"
+[md:require]: diagram.dot.render ">=0.14" trailing

@@ -1,8 +1,15 @@
+[md:profile]: md++
+[md:profile-version]: 0.14
+[md:require]: model.dot
+[md:require]: diagram.dot.render
+
+# Plugin Resource Denied
+
 ```dot model=system
 digraph G {
   A -> B
 }
 ```
 
-```diagram.dot.render source=system stylesheet=../../outside.css
+```diagram.dot.render source=system stylesheet="https://example.invalid/denied/render.css"
 ```

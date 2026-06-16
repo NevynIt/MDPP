@@ -18,13 +18,16 @@ The suite is intentionally source-focused. Each example directory contains the m
 
 ## Minimum proof plugins
 
-The suite assumes only the minimum proof plugins discussed in the proposal:
+The suite assumes only the minimum proof plugins needed by the fixtures:
 
 - `math.latex`
 - `diagram.mermaid`
 - `model.dot`
+- `diagram.dot`
 - `diagram.dot.render`
-- `layout.grid`
-- `highlight.*`
+- `highlight.prism` or `highlight.core`
+- `layout.markdown.sections`
+- `layout.flow`
+- `area.flow`
 
 Everything else should remain core-host behavior.

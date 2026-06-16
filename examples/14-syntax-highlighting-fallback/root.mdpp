@@ -1,6 +1,6 @@
 [md:profile]: md++
 [md:profile-version]: 0.14
-[md:require]: highlight.typescript
+[md:require]: highlight.prism
 
 # Syntax Highlighting Fallback
 
