@@ -2,6 +2,7 @@
 [md:profile-version]: 0.14
 [md:require]: model.dot
 [md:require]: diagram.dot.render
+[md:require]: resource
 
 # Plugin Resource Denied
 

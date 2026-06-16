@@ -1,3 +1,11 @@
+[md:profile]: md++
+[md:profile-version]: 0.14
+[md:require]: model.dot
+[md:require]: diagram.dot.render
+[md:require]: resource
+
+# Plugin Resource Request Relative
+
 ```dot model=system
 digraph G {
   A -> B

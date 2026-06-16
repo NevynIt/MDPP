@@ -1,11 +1,11 @@
 # md++ Draft 0.14 Bundle
 
-This bundle contains the md++ language spec, reference runtime architecture, diagnostic catalog, artifact schema skeleton, and reference implementation planning documents.
+This bundle contains the md++ language spec, reference runtime architecture, diagnostic catalog, artifact schema skeleton, reference implementation planning documents, and compliance-oriented source examples.
 
 ## Folder structure
 
 ```text
-mdpp_v0_14_bundle/
+MDPP/
   README.md
   RELEASE_NOTES_v0_14.md
   specs/
@@ -19,6 +19,12 @@ mdpp_v0_14_bundle/
     mdpp_reference_components_v0_14.md
     mdpp_application_profiles_v0_14.md
     mdpp_implementation_roadmap_v0_14.md
+  examples/
+    README.md
+    SUITE_MANIFEST.md
+    01-plain-gfm-document/
+    ...
+    70-complete-minimal-document/
 ```
 
 ## Reading order
@@ -31,6 +37,8 @@ mdpp_v0_14_bundle/
 6. `implementation/mdpp_reference_components_v0_14.md`
 7. `implementation/mdpp_application_profiles_v0_14.md`
 8. `implementation/mdpp_implementation_roadmap_v0_14.md`
+9. `examples/README.md`
+10. `examples/SUITE_MANIFEST.md`
 
 ## Implementation targets
 

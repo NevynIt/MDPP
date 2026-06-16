@@ -44,6 +44,7 @@ Ranges:
 | `MDPP0003` | warning | markdown | Base Markdown input is not valid GFM |
 | `MDPP0004` | error | directive | Invalid `md:` directive syntax |
 | `MDPP0005` | warning | directive | Repeated directive ignored by a non-conforming parser |
+| `MDPP0006` | error | anchor | Duplicate explicit anchor |
 | `MDPP0100` | error | requirement | Invalid requirement syntax |
 | `MDPP0101` | error | requirement | Invalid capability version range |
 | `MDPP0102` | warning | requirement | Missing required capability |

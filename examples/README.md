@@ -2,11 +2,11 @@
 
 This folder contains hand-authored `md++ v0.14` source fixtures derived from:
 
-- [specs/mdpp_language_spec_v0_14.md](/C:/Stuff/MDPP/specs/mdpp_language_spec_v0_14.md)
-- [specs/mdpp_diagnostic_catalog_v0_14.md](/C:/Stuff/MDPP/specs/mdpp_diagnostic_catalog_v0_14.md)
-- [implementation/mdpp_reference_plugin_catalog_v0_14.md](/C:/Stuff/MDPP/implementation/mdpp_reference_plugin_catalog_v0_14.md)
+- [`../specs/mdpp_language_spec_v0_14.md`](../specs/mdpp_language_spec_v0_14.md)
+- [`../specs/mdpp_diagnostic_catalog_v0_14.md`](../specs/mdpp_diagnostic_catalog_v0_14.md)
+- [`../implementation/mdpp_reference_plugin_catalog_v0_14.md`](../implementation/mdpp_reference_plugin_catalog_v0_14.md)
 
-The suite is intentionally source-focused. Each example directory contains the md++ inputs needed to exercise one compliance scenario. Expected resolved artifacts are not included yet.
+The suite is source-focused. Each example directory contains the md++ inputs needed to exercise one compliance scenario. Expected behavior and diagnostics are listed in [`SUITE_MANIFEST.md`](SUITE_MANIFEST.md).
 
 ## Conventions
 
@@ -20,6 +20,8 @@ The suite is intentionally source-focused. Each example directory contains the m
 
 The suite assumes only the minimum proof plugins needed by the fixtures:
 
+- `include`
+- `resource`
 - `math.latex`
 - `diagram.mermaid`
 - `model.dot`

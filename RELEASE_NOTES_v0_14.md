@@ -28,4 +28,5 @@ This bundle carries forward the v0.13 language/runtime specifications as draft 0
 - stable component/module breakdown;
 - app-specific architecture profiles;
 - implementation roadmap and milestones;
-- clear separation between language semantics, runtime architecture, plugin behavior, and application shells.
+- clear separation between language semantics, runtime architecture, plugin behavior, and application shells;
+- compliance-oriented example suite with expected returns and diagnostic codes.
