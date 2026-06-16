@@ -23,10 +23,10 @@ A Node.js command-line application reads an md++ entry document and produces HTM
 Example commands:
 
 ```bash
-mdpp render ./docs/report.mdpp --out ./dist/report.html
-mdpp render ./docs/report.mdpp --pdf --out ./dist/report.pdf
-mdpp validate ./docs/report.mdpp --format json
-mdpp bundle ./docs/report.mdpp --out ./dist/report.mdpp.zip
+mdpp render ./docs/report.md --out ./dist/report.html
+mdpp render ./docs/report.md --pdf --out ./dist/report.pdf
+mdpp validate ./docs/report.md --format json
+mdpp bundle ./docs/report.md --out ./dist/report.md.zip
 ```
 
 ### 1.2. Required capabilities
@@ -94,7 +94,7 @@ Example usage:
 
 ```tsx
 <MdppViewer
-  entry="main.mdpp"
+  entry="main.md"
   resources={resourceMap}
   plugins={plugins}
   onDiagnostics={setDiagnostics}

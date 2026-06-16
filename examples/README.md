@@ -11,7 +11,7 @@ The suite is source-focused. Each example directory contains the md++ inputs nee
 ## Conventions
 
 - Example folders use `NN-short-name`.
-- The main source file is `root.mdpp`.
+- The main source file is `root.md`.
 - Supporting files are local to the example directory unless the scenario is explicitly about repositories.
 - Examples that need repository-qualified resources use a local `shared/` subtree inside the example directory.
 - Examples that are meant to produce diagnostics include invalid source on purpose.

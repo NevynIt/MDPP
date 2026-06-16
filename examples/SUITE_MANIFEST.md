@@ -5,7 +5,7 @@ This manifest turns the language spec, diagnostic catalog, and compliance scenar
 ## Drafting rules
 
 - Keep fixtures minimal. Add only the source needed to prove the target behavior.
-- Prefer `.mdpp` for the main file and `.md`, `.css`, `.svg` for supporting resources where appropriate.
+- Prefer `.md` for the main file and `.md`, `.css`, `.svg` for supporting resources where appropriate.
 - Use deterministic content and simple wording.
 - When a scenario is diagnostic-only, keep the rest of the document valid.
 - Preserve source order for repeated directives.

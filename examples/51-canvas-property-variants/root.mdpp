@@ -1,8 +1,0 @@
-[md:profile]: md++
-[md:profile-version]: 0.14
-[md:layout]: ./layout-a.mdpp
-[md:layout]: ./layout-b.mdpp
-[md:layout]: ./layout-c.mdpp
-[md:layout]: ./layout-d.mdpp
-
-# Canvas Property Variants

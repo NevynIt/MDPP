@@ -7,7 +7,7 @@
 
 Status: draft 0.14  
 File type: Markdown-compatible extension profile  
-Canonical extensions: `.md`, `.mdpp`
+Canonical extension: `.md`
 
 This document defines the portable md++ Markdown-based authoring profile: syntax, author-visible semantics, rendering conventions, layouts, models, and diagnostics.
 
@@ -75,7 +75,7 @@ A processor MUST preserve repeated `md:` directives in source order, even when a
    [md:profile]: md++
    [md:require]: diagram.mermaid
    [md:include]: ./chapters/intro.md
-   [md:theme]: ./themes/company.theme.mdpp
+   [md:theme]: ./themes/company.theme.md
    [md:stylesheet]: ./styles/spec.css
    [md:layout]: ./layouts/two-columns.layout.md
    ```
@@ -142,7 +142,7 @@ Example:
 [md:profile]: md++
 [md:profile-version]: 0.14
 [md:require]: diagram.mermaid
-[md:theme]: ./themes/company.theme.mdpp
+[md:theme]: ./themes/company.theme.md
 [md:layout]: ./layouts/two-columns.layout.md
 [md:include]: ./chapter.md
 
@@ -164,21 +164,18 @@ A plain Markdown renderer may ignore the directives and display fenced blocks as
 
 ## 5. File extensions
 
-The terminal file extension is either `.md` or `.mdpp`.
+The recommended terminal file extension is `.md`, because md++ files are valid Markdown files and should remain recognizable to ordinary Markdown tools.
 
 Recommended naming patterns:
 
 | Pattern | Meaning |
 |---|---|
 | `document.md` | Markdown-compatible md++ document |
-| `document.mdpp` | Explicit md++ document |
 | `company.theme.md` | Theme resource written as md++ and parsed in theme context |
-| `company.theme.mdpp` | Explicit md++ theme resource |
 | `two-columns.layout.md` | Layout resource written as md++ and parsed in layout context |
-| `two-columns.layout.mdpp` | Explicit md++ layout resource |
 | `company.css` | Plain CSS stylesheet resource |
 
-The semantic suffix before the terminal extension is a convention. A plain `.md` or `.mdpp` file may also be used as a document, theme, or layout resource when referenced in that context. CSS stylesheets use the `.css` extension.
+The semantic suffix before the terminal extension is a convention. A plain `.md` file may also be used as a document, theme, or layout resource when referenced in that context. CSS stylesheets use the `.css` extension.
 
 The profile name is `md++`. The directive namespace is `md:`.
 
@@ -233,7 +230,7 @@ Examples:
 [md:require]: diagram.mermaid ">=10 <11"
 [md:include]: ./sections/overview.md
 [md:include]: <./sections/overview with spaces.md>
-[md:theme]: ./themes/company.theme.mdpp
+[md:theme]: ./themes/company.theme.md
 [md:stylesheet]: ./styles/default.css
 [md:layout]: ./layouts/report.layout.md
 ```
@@ -539,7 +536,7 @@ Examples:
 ```markdown
 [md:include]: shared:chapters/intro.md
 [md:layout]: shared:layouts/report.layout.md
-[md:theme]: shared:themes/company.theme.mdpp
+[md:theme]: shared:themes/company.theme.md
 [md:stylesheet]: shared:styles/default.css
 ```
 
@@ -588,7 +585,7 @@ For example:
 
 ```text
 shared:icons/database.svg
-corporate:themes/company.theme.mdpp
+corporate:themes/company.theme.md
 ```
 
 Relative resource requests should be resolved against the source file that contains the requesting block, unless the plugin or host defines a more specific base.
@@ -627,7 +624,7 @@ md++ separates presentation into three authoring levels:
 A document may use only a theme:
 
 ```markdown
-[md:theme]: ./themes/company.theme.mdpp
+[md:theme]: ./themes/company.theme.md
 ```
 
 The theme may then reference the layout and stylesheets needed to render the document. This keeps common documents simple while allowing more advanced authors to override specific layers.
@@ -637,8 +634,8 @@ The theme may then reference the layout and stylesheets needed to render the doc
 The theme directive declares a theme resource:
 
 ```markdown
-[md:theme]: ./themes/company.theme.mdpp
-[md:theme]: shared:themes/company.theme.mdpp
+[md:theme]: ./themes/company.theme.md
+[md:theme]: shared:themes/company.theme.md
 ```
 
 A theme resource is an md++ file parsed in theme context. It may contain design tokens and may declare layouts and stylesheets using normal md++ directives.
@@ -651,7 +648,7 @@ Example:
 [md:profile]: md++
 [md:profile-version]: 0.14
 [md:title]: <Company Report Theme>
-[md:layout]: ./report.layout.mdpp
+[md:layout]: ./report.layout.md
 [md:stylesheet]: ./base.css
 [md:stylesheet]: ./components.css
 
@@ -676,10 +673,9 @@ Recommended theme filenames end in:
 
 ```text
 .theme.md
-.theme.mdpp
 ```
 
-A plain `.md` or `.mdpp` file may also be used as a theme resource when referenced by `[md:theme]:`. If its content cannot be interpreted as a theme, the host reports diagnostics.
+A plain `.md` file may also be used as a theme resource when referenced by `[md:theme]:`. If its content cannot be interpreted as a theme, the host reports diagnostics.
 
 ### Theme contents
 
@@ -697,7 +693,7 @@ Theme vocabularies may evolve by profile and host. Portable themes should prefer
 The layout directive declares a layout resource:
 
 ```markdown
-[md:layout]: ./layouts/report.layout.mdpp
+[md:layout]: ./layouts/report.layout.md
 [md:layout]: shared:layouts/two-columns.layout.md
 ```
 
@@ -707,7 +703,6 @@ Recommended layout filenames end in:
 
 ```text
 .layout.md
-.layout.mdpp
 ```
 
 ### Stylesheet directive
@@ -744,8 +739,8 @@ A document-level layout overrides the active layout selected by the theme for ma
 Example:
 
 ```markdown
-[md:theme]: ./themes/company.theme.mdpp
-[md:layout]: ./layouts/technical-report.layout.mdpp
+[md:theme]: ./themes/company.theme.md
+[md:layout]: ./layouts/technical-report.layout.md
 [md:stylesheet]: ./styles/local-overrides.css
 ```
 
@@ -909,9 +904,9 @@ caption: System graph
 A document may declare multiple themes.
 
 ```markdown
-[md:theme]: ./themes/base.theme.mdpp
-[md:theme]: ./themes/company.theme.mdpp
-[md:theme]: ./themes/report.theme.mdpp
+[md:theme]: ./themes/base.theme.md
+[md:theme]: ./themes/company.theme.md
+[md:theme]: ./themes/report.theme.md
 ```
 
 Themes are resolved in source order.
@@ -1558,17 +1553,16 @@ The layout directive declares layout resources:
 
 ```markdown
 [md:layout]: ./layouts/two-columns.layout.md
-[md:layout]: shared:layouts/report.layout.mdpp
+[md:layout]: shared:layouts/report.layout.md
 ```
 
 Recommended layout filenames end in:
 
 ```text
 .layout.md
-.layout.mdpp
 ```
 
-A plain `.md` or `.mdpp` file may also be used as a layout resource. When the file is referenced by `[md:layout]:`, the host parses it in layout context. Content that cannot be interpreted as a layout produces diagnostics.
+A plain `.md` file may also be used as a layout resource. When the file is referenced by `[md:layout]:`, the host parses it in layout context. Content that cannot be interpreted as a layout produces diagnostics.
 
 A layout resource uses Markdown-readable structure:
 
@@ -1826,7 +1820,7 @@ This section is an authoring convention, not a mandatory portable page-building 
 [md:require]: math.latex
 [md:require]: highlight.typescript
 [md:repository:shared]: ./shared
-[md:theme]: shared:themes/company.theme.mdpp
+[md:theme]: shared:themes/company.theme.md
 [md:layout]: shared:layouts/two-columns.layout.md
 
 # Architecture Roadmap

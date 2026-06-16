@@ -1,6 +1,6 @@
 [md:profile]: md++
 [md:profile-version]: 0.14
-[md:theme]: ./theme.mdpp
-[md:layout]: ./layout.mdpp
+[md:theme]: ./theme.md
+[md:layout]: ./layout.md
 
 # Token References In Layout

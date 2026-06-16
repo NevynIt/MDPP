@@ -9,8 +9,8 @@
 [md:require]: math.latex
 [md:require]: highlight.core
 [md:repository:shared]: ./shared
-[md:theme]: shared:themes/company.theme.mdpp
-[md:layout]: shared:layouts/two-columns.layout.mdpp
+[md:theme]: shared:themes/company.theme.md
+[md:layout]: shared:layouts/two-columns.layout.md
 [md:stylesheet]: ./doc.css
 [md:include]: ./chapter.md
 

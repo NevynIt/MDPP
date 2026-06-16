@@ -178,8 +178,8 @@ The following type names are recommended for portable md++ ecosystems:
 | `mdpp.interactions` | Interaction binding collection |
 | `mdpp.diagnostics` | Diagnostic report document |
 | `css.stylesheet` | CSS stylesheet resource |
-| `theme.mdpp` | Theme resource parsed in theme context |
-| `layout.mdpp` | Layout resource parsed in layout context |
+| `theme.md` | Theme resource parsed in theme context |
+| `layout.md` | Layout resource parsed in layout context |
 | `svg.document` | SVG document or subtree |
 | `html.fragment` | Sanitized or host-owned HTML fragment |
 | `pdf.document` | PDF output document |
@@ -623,7 +623,7 @@ For example:
 
 ```text
 shared:icons/database.svg
-corporate:themes/company.theme.mdpp
+corporate:themes/company.theme.md
 ```
 
 The host resolves the repository name through the global repository table, calls the registered repository provider, applies its own access policy, fetches the content when allowed, and returns either a resource response or an error diagnostic to the plugin.

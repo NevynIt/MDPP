@@ -1,6 +1,6 @@
 [md:profile]: md++
 [md:profile-version]: 0.14
-[md:theme]: ./theme.mdpp
+[md:theme]: ./theme.md
 [md:require]: model.dot
 [md:require]: diagram.dot.render
 

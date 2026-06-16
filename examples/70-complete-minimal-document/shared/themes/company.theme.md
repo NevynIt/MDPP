@@ -1,7 +1,7 @@
 [md:profile]: md++
 [md:profile-version]: 0.14
 [md:title]: <Company Theme>
-[md:layout]: ../layouts/two-columns.layout.mdpp
+[md:layout]: ../layouts/two-columns.layout.md
 [md:stylesheet]: ../styles/company.css
 
 # Company Theme
