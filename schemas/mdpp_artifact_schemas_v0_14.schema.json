@@ -1,0 +1,857 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mdpp.example/mdpp-artifacts-v0.14.schema.json",
+  "title": "md++ exchanged artifact schemas",
+  "description": "Draft skeleton JSON Schema definitions for md++ runtime exchanged artifacts. This is intentionally incomplete and will be expanded in later drafts.",
+  "type": "object",
+  "$defs": {
+    "MdSeverity": {
+      "type": "string",
+      "enum": [
+        "info",
+        "warning",
+        "error"
+      ]
+    },
+    "MdSourceOrigin": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "column": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "endLine": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "endColumn": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "repository": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string"
+        }
+      }
+    },
+    "MdDiagnostic": {
+      "type": "object",
+      "required": [
+        "source",
+        "severity",
+        "message"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "source": {
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/MdSeverity"
+        },
+        "message": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^MDPP[0-9]{4}$"
+        },
+        "origin": {
+          "$ref": "#/$defs/MdSourceOrigin"
+        },
+        "file": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "layout": {
+          "type": "string"
+        },
+        "area": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "capability": {
+          "type": "string"
+        }
+      }
+    },
+    "MdContentHash": {
+      "type": "object",
+      "required": [
+        "algorithm",
+        "value"
+      ],
+      "properties": {
+        "algorithm": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MdTextNode": {
+      "type": "object",
+      "required": [
+        "id",
+        "text"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MdElementNode": {
+      "type": "object",
+      "required": [
+        "id",
+        "tag"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "tag": {
+          "type": "string"
+        },
+        "attrs": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MdNode"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "MdNode": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/MdElementNode"
+        },
+        {
+          "$ref": "#/$defs/MdTextNode"
+        }
+      ]
+    },
+    "MdPatch": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "op",
+            "node"
+          ],
+          "properties": {
+            "op": {
+              "const": "replace-tree"
+            },
+            "node": {
+              "$ref": "#/$defs/MdNode"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "op",
+            "id",
+            "node"
+          ],
+          "properties": {
+            "op": {
+              "const": "replace"
+            },
+            "id": {
+              "type": "string"
+            },
+            "node": {
+              "$ref": "#/$defs/MdNode"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "op",
+            "id"
+          ],
+          "properties": {
+            "op": {
+              "enum": [
+                "remove"
+              ]
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "op",
+            "parentId",
+            "node"
+          ],
+          "properties": {
+            "op": {
+              "enum": [
+                "append"
+              ]
+            },
+            "parentId": {
+              "type": "string"
+            },
+            "node": {
+              "$ref": "#/$defs/MdNode"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "op",
+            "parentId",
+            "index",
+            "node"
+          ],
+          "properties": {
+            "op": {
+              "enum": [
+                "insert"
+              ]
+            },
+            "parentId": {
+              "type": "string"
+            },
+            "index": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "node": {
+              "$ref": "#/$defs/MdNode"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "op",
+            "id",
+            "name",
+            "value"
+          ],
+          "properties": {
+            "op": {
+              "const": "setAttr"
+            },
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "op",
+            "id",
+            "name"
+          ],
+          "properties": {
+            "op": {
+              "const": "removeAttr"
+            },
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "op",
+            "id",
+            "text"
+          ],
+          "properties": {
+            "op": {
+              "const": "setText"
+            },
+            "id": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "MdDomCoordinate": {
+      "type": "object",
+      "required": [
+        "x",
+        "y"
+      ],
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "enum": [
+            "css-px"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "MdInteractionBinding": {
+      "type": "object",
+      "required": [
+        "id",
+        "targetId",
+        "event",
+        "action"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "targetId": {
+          "type": "string"
+        },
+        "event": {
+          "type": "string"
+        },
+        "action": {
+          "$ref": "#/$defs/MdInteractionAction"
+        },
+        "options": {
+          "type": "object"
+        },
+        "source": {
+          "$ref": "#/$defs/MdSourceOrigin"
+        }
+      }
+    },
+    "MdInteractionAction": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/MdHostAction"
+        },
+        {
+          "$ref": "#/$defs/MdPluginAction"
+        },
+        {
+          "$ref": "#/$defs/MdWorkerAction"
+        }
+      ]
+    },
+    "MdHostAction": {
+      "type": "object",
+      "required": [
+        "kind",
+        "action"
+      ],
+      "properties": {
+        "kind": {
+          "const": "host-action"
+        },
+        "action": {
+          "type": "string"
+        },
+        "params": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MdPluginAction": {
+      "type": "object",
+      "required": [
+        "kind",
+        "pluginId",
+        "action"
+      ],
+      "properties": {
+        "kind": {
+          "const": "plugin-action"
+        },
+        "pluginId": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "params": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MdWorkerAction": {
+      "type": "object",
+      "required": [
+        "kind",
+        "action"
+      ],
+      "properties": {
+        "kind": {
+          "const": "worker-action"
+        },
+        "pluginId": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "params": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MdResourceResponse": {
+      "type": "object",
+      "required": [
+        "requestedRef",
+        "diagnostics"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "requestedRef": {
+          "type": "string"
+        },
+        "resolvedRef": {
+          "type": "string"
+        },
+        "mediaType": {
+          "type": "string"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hash": {
+          "$ref": "#/$defs/MdContentHash"
+        },
+        "sourceOrigin": {
+          "$ref": "#/$defs/MdSourceOrigin"
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MdDiagnostic"
+          }
+        },
+        "content": {}
+      }
+    },
+    "MdUsedResource": {
+      "type": "object",
+      "required": [
+        "requestedRef",
+        "role"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "requestedRef": {
+          "type": "string"
+        },
+        "resolvedRef": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "mediaType": {
+          "type": "string"
+        },
+        "hash": {
+          "$ref": "#/$defs/MdContentHash"
+        },
+        "version": {
+          "type": "string"
+        },
+        "providerId": {
+          "type": "string"
+        },
+        "origin": {
+          "$ref": "#/$defs/MdSourceOrigin"
+        }
+      }
+    },
+    "MdUsedPlugin": {
+      "type": "object",
+      "required": [
+        "id",
+        "version",
+        "role"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "role": {
+          "type": "string"
+        }
+      }
+    },
+    "MdSourceMapEntry": {
+      "type": "object",
+      "required": [
+        "nodeId",
+        "sourceRange"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "nodeId": {
+          "type": "string"
+        },
+        "sourceRange": {
+          "$ref": "#/$defs/MdSourceOrigin"
+        },
+        "role": {
+          "type": "string"
+        }
+      }
+    },
+    "MdSourceMap": {
+      "type": "object",
+      "required": [
+        "entries"
+      ],
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MdSourceMapEntry"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "MdDocument": {
+      "type": "object",
+      "required": [
+        "id",
+        "type"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "mediaType": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string"
+        },
+        "origin": {
+          "$ref": "#/$defs/MdSourceOrigin"
+        },
+        "metadata": {
+          "type": "object"
+        },
+        "content": {},
+        "semantic": {},
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MdDiagnostic"
+          }
+        },
+        "patches": {
+          "type": "array"
+        }
+      }
+    },
+    "MdRenderDocumentRequest": {
+      "type": "object",
+      "required": [
+        "entry",
+        "context"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "entry": {},
+        "context": {},
+        "options": {
+          "type": "object"
+        }
+      }
+    },
+    "MdRenderDocumentResult": {
+      "type": "object",
+      "required": [
+        "snapshot",
+        "state",
+        "resources",
+        "plugins",
+        "sourceMap",
+        "diagnostics"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "snapshot": {
+          "$ref": "#/$defs/MdNode"
+        },
+        "state": {
+          "type": "object"
+        },
+        "resources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MdUsedResource"
+          }
+        },
+        "plugins": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MdUsedPlugin"
+          }
+        },
+        "sourceMap": {
+          "$ref": "#/$defs/MdSourceMap"
+        },
+        "interactions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MdInteractionBinding"
+          }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MdDiagnostic"
+          }
+        }
+      }
+    },
+    "MdRpcRequest": {
+      "type": "object",
+      "required": [
+        "jsonrpc",
+        "method"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "method": {
+          "type": "string"
+        },
+        "params": {}
+      },
+      "additionalProperties": false
+    },
+    "MdRpcSuccessResponse": {
+      "type": "object",
+      "required": [
+        "jsonrpc",
+        "id",
+        "result"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "result": {}
+      },
+      "additionalProperties": false
+    },
+    "MdRpcErrorResponse": {
+      "type": "object",
+      "required": [
+        "jsonrpc",
+        "error"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "type": "object",
+          "required": [
+            "code",
+            "message"
+          ],
+          "properties": {
+            "code": {
+              "type": "integer"
+            },
+            "message": {
+              "type": "string"
+            },
+            "data": {}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "MdPluginManifest": {
+      "type": "object",
+      "required": [
+        "id",
+        "version",
+        "capabilities"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "schema": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "version"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "workerEntryPoint": {
+          "type": "string"
+        },
+        "mainThreadEntryPoint": {
+          "type": "string"
+        },
+        "hooks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "permissions": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}
