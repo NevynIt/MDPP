@@ -1,7 +1,12 @@
-```js key=value flag
-code
+[md:profile]: md++
+[md:profile-version]: 0.14
+
+# Fenced Info String Grammar
+
+```text key=value mode="quoted value" label='single quoted value' enabled
+sample
 ```
 
-```python key="quoted value" other='quoted value'
-code
+```diagram.dot.render source=system-graph caption-position=bottom theme="compact print" bordered
+caption: Valid info string ordering
 ```

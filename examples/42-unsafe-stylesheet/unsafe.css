@@ -1,0 +1,8 @@
+@import url("http://example.com/x.css");
+
+body {
+  background: url("javascript:alert(1)");
+  -moz-binding: url("http://example.com/binding.xml#x");
+}
+
+/* <script>alert(1)</script> */

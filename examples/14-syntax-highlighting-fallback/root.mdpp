@@ -1,9 +1,13 @@
-[md:require]: syntax-highlighting
+[md:profile]: md++
+[md:profile-version]: 0.14
+[md:require]: highlight.typescript
 
-```go
-fmt.Println("known")
+# Syntax Highlighting Fallback
+
+```typescript
+export const answer = 42;
 ```
 
-```madeuplang
-fallback
+```custom-language
+fallback should remain visible
 ```

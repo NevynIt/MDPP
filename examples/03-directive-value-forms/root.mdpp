@@ -1,12 +1,8 @@
 [md:profile]: md++
-[md:profile-version]: 0.14
-[md:title]: <Directive Value Forms>
-[md:require]: diagram.mermaid ">=10 <11"
-[md:include]: <./sections/overview with spaces.md>
-[md:stylesheet]: ./styles/base.css
+[md:stylesheet]: styles/main.css
+[md:theme]: <themes/dark mode.mdpp>
+[md:require]: diagram.dot.render '>=0.14 <0.15'
 
-[md:include]: ./path/with-trailing.md trailing
-[md:title]: <bad < angle>
-[md:require]: diagram.mermaid ">=10 <11" "extra title"
-
-# Directive Value Forms
+[md:theme]: <themes/broken.mdpp
+[md:stylesheet]: styles/extra.css 'unexpected title'
+[md:require]: diagram.dot.render '>=0.14' trailing

@@ -1,20 +1,17 @@
-# Plain GFM Document
+# Plain GFM
 
-Paragraph with **strong** text, *emphasis*, a [link](https://example.org), and a local image.
+Plain Markdown with a [link](https://example.com), emphasis, and a local image.
 
-![Example image](image.svg)
+![Fixture image](image.svg)
 
-- alpha
-- beta
+- First item
+- Second item
 
-1. one
-2. two
+| A | B |
+| - | - |
+| 1 | 2 |
 
-> A quoted line.
-
-| Name | Value |
-|---|---|
-| left | right |
+> A short quote.
 
 ```text
 plain code

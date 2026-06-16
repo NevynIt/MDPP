@@ -1,8 +1,7 @@
 [md:profile]: md++
-[md:profile-version]: 0.14
-[md:title]: <Profile Only Document>
+[md:title]: <Profile Only>
 [md:status]: draft
 
 # Profile Only
 
-The metadata above is the feature under test.
+Metadata directives only.

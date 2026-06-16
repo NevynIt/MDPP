@@ -1,17 +1,8 @@
-[md:profile]: md++
-[md:profile-version]: 0.14
-[md:require]: model.dot
-[md:require]: diagram.dot.render
-
-# Plugin Resource Request Relative
-
-```dot model=system-graph
+```dot model=system
 digraph G {
-  Database -> Service
+  A -> B
 }
 ```
 
-```diagram.dot.render source=system-graph
-icon: ./icons/db.svg
-caption: Relative icon request
+```diagram.dot.render source=system stylesheet=./render.css
 ```

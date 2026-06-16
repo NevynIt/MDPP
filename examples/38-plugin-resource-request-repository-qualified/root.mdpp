@@ -1,18 +1,10 @@
-[md:profile]: md++
-[md:profile-version]: 0.14
-[md:require]: model.dot
-[md:require]: diagram.dot.render
 [md:repository:shared]: ./shared
 
-# Plugin Resource Request Repository Qualified
-
-```dot model=system-graph
+```dot model=system
 digraph G {
-  Client -> API
+  A -> B
 }
 ```
 
-```diagram.dot.render source=system-graph
-icon: shared:icons/db.svg
-caption: Repository icon request
+```diagram.dot.render source=system stylesheet=shared:render.css
 ```
