@@ -8,6 +8,7 @@ import {
   numPr,
   paragraphStyleId,
   parseComments,
+  parseXml,
   parseRelationships,
   parseStyles,
   readDocxPackage,
@@ -439,8 +440,8 @@ function extractPageFurniture(state: ConversionState, documentXml: Document): Re
     if (!rel) continue;
     const part = resolvePartTarget("word/document.xml", rel.target);
     const xmlText = state.packageEntries[part] ? new TextDecoder().decode(state.packageEntries[part]) : undefined;
-    if (!xmlText) continue;
-    const doc = new DOMParser({ errorHandler: () => undefined }).parseFromString(xmlText, "application/xml");
+    const doc = parseXml(xmlText);
+    if (!doc) continue;
     const text = descendants(doc, "p").map(p => textOf(p).trim()).filter(Boolean).join(" / ");
     if (!text) continue;
     if (localName(ref) === "headerReference") result.headerCenter = text;

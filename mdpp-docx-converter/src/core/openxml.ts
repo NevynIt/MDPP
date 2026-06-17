@@ -14,21 +14,23 @@ export interface DocxPackage {
 export async function readDocxPackage(data: Uint8Array | ArrayBuffer | Blob): Promise<DocxPackage> {
   const bytes = await toUint8Array(data);
   const entries = unzipSync(bytes);
+  const readText = (path: string): string | undefined => {
+    const entry = entries[normalizeZipPath(path)];
+    return entry ? decoder.decode(entry) : undefined;
+  };
   return {
     entries,
-    text(path: string) {
-      const entry = entries[normalizeZipPath(path)];
-      return entry ? decoder.decode(entry) : undefined;
-    },
-    xml(path: string) {
-      const xmlText = this.text(path);
-      if (!xmlText) return undefined;
-      return new DOMParser({ errorHandler: () => undefined }).parseFromString(xmlText, "application/xml");
-    },
+    text: readText,
+    xml: path => parseXml(readText(path)),
     binary(path: string) {
       return entries[normalizeZipPath(path)];
     }
   };
+}
+
+export function parseXml(xmlText: string | undefined): Document | undefined {
+  if (!xmlText) return undefined;
+  return new DOMParser({ errorHandler: () => undefined }).parseFromString(xmlText, "application/xml") as unknown as Document;
 }
 
 async function toUint8Array(data: Uint8Array | ArrayBuffer | Blob): Promise<Uint8Array> {
@@ -67,8 +69,9 @@ export function isElement(node: Node | null | undefined, wanted?: string): node 
   return wanted ? localName(node) === wanted : true;
 }
 
-export function children(el: Element | Document, wanted?: string): Element[] {
+export function children(el: Element | Document | undefined, wanted?: string): Element[] {
   const result: Element[] = [];
+  if (!el) return result;
   const list = el.childNodes;
   for (let i = 0; i < list.length; i++) {
     const child = list.item(i);
@@ -77,7 +80,7 @@ export function children(el: Element | Document, wanted?: string): Element[] {
   return result;
 }
 
-export function firstChild(el: Element | Document, wanted: string): Element | undefined {
+export function firstChild(el: Element | Document | undefined, wanted: string): Element | undefined {
   return children(el, wanted)[0];
 }
 
