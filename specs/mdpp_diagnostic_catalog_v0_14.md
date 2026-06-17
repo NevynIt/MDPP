@@ -33,6 +33,7 @@ Ranges:
 | `MDPP0400` - `MDPP0499` | Themes, stylesheets, layouts, pages, and areas |
 | `MDPP0500` - `MDPP0599` | Rendering, source maps, patches, and interactions |
 | `MDPP0600` - `MDPP0699` | Runtime, plugins, manifests, IPC/RPC, and jobs |
+| `MDPP0700` - `MDPP0799` | Import, export, and lossy conversion |
 | `MDPP9000` - `MDPP9999` | Host-defined or experimental diagnostics |
 
 ## 2. Initial code list
@@ -79,6 +80,12 @@ Ranges:
 | `MDPP0410` | error | area | Unresolvable flow cycle |
 | `MDPP0411` | warning | area | Unsupported area renderer |
 | `MDPP0412` | error | token | Theme token reference cannot be resolved |
+| `MDPP0413` | warning | theme | Unknown theme heading kind ignored |
+| `MDPP0414` | warning | theme-class | Invalid or unsupported theme class declaration |
+| `MDPP0415` | warning | theme-component | Invalid or unsupported theme component declaration |
+| `MDPP0416` | error | page-furniture | Unknown page-furniture profile |
+| `MDPP0417` | warning | page-furniture | Page-furniture generated value cannot be resolved |
+| `MDPP0418` | warning | page-furniture | Page count unavailable for selected output |
 | `MDPP0500` | warning | source-map | Source mapping unavailable or ambiguous |
 | `MDPP0501` | error | patch | Invalid DOM patch target |
 | `MDPP0502` | error | renderer-state | Renderer state incompatible with update request |
@@ -90,6 +97,12 @@ Ranges:
 | `MDPP0602` | error | rpc | Invalid JSON-RPC message |
 | `MDPP0603` | error | rpc | Unknown runtime RPC method |
 | `MDPP0604` | warning | job | Runtime job failed |
+| `MDPP0700` | warning | import | Source feature omitted or simplified during import |
+| `MDPP0701` | info | import-style | Imported source style mapped to an md++ class |
+| `MDPP0702` | info | import-comment | Imported comment or review note moved to a sidecar |
+| `MDPP0703` | warning | import-object | Imported embedded object extracted as a static asset or placeholder |
+| `MDPP0704` | warning | import-pagination | Source pagination could not be preserved exactly |
+| `MDPP0705` | warning | import-sidecar | Import sidecar reference could not be resolved or anchored |
 
 ## 3. Diagnostic object
 

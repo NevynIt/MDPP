@@ -402,3 +402,25 @@ The following should remain tracked in the runtime architecture or future implem
 - exact visual output expectations for area renderer plugins;
 - editor-grade reversible transformations between source and rendered structure;
 - packaging format for browser-friendly md++ bundles.
+
+<!-- BEGIN mdpp-office-pipeline-update-v0-14: plugin-catalog -->
+
+## 7. Office import and presentation helper plugins
+
+| Plugin id | Capability | Input | Output | Purpose |
+|---|---|---|---|---|
+| `document.mdpp.comment-sidecar` | `mdpp.comment-sidecar@1` | sidecar resource | `mdpp.comment-sidecar` | Represent imported comments, review notes, speaker notes, and traceability metadata. |
+| `import.office.openxml` | `import.office@1` | `office.docx`, `office.pptx` | `mdpp.source`, `mdpp.comment-sidecar`, diagnostics | Convert DOCX/PPTX into semantic md++ with lossy-import diagnostics. |
+| `presentation.theme-classes` | `mdpp.presentation@1` | theme resource | presentation context | Resolve `## class`, `## component`, and `## page-furniture` declarations. |
+
+The importer should prefer semantic Markdown/md++ output over full Office object-model fidelity. Unsupported source features should produce `MDPP0700`-range diagnostics and, when useful, static assets or placeholders.
+
+Optional Office-normalization plugins for a reference implementation:
+
+```text
+document.mdpp.comment-sidecar
+import.office.openxml
+presentation.theme-classes
+```
+
+<!-- END mdpp-office-pipeline-update-v0-14: plugin-catalog -->

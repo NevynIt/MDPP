@@ -260,3 +260,38 @@ Until then, visual editing should be limited to source editing plus rich preview
 12. React viewer with DOM adapter and interaction dispatch.
 13. Dynamic update and patch stabilization.
 14. Editor core prototype.
+
+<!-- BEGIN mdpp-office-pipeline-update-v0-14: application-profiles -->
+
+## 6. Target D: Office-to-md++ normalization pipeline
+
+### 6.1. Goal
+
+A conversion pipeline reads DOCX/PPTX or similar Office-like source documents and produces semantic md++ that can be edited as text and rendered to HTML/PDF.
+
+```text
+DOCX/PPTX -> md++ source + sidecar metadata + diagnostics -> text editing -> HTML/PDF rendering
+```
+
+### 6.2. Required capabilities
+
+The pipeline should support:
+
+- headings and paragraphs as Markdown;
+- named Word/PowerPoint styles as md++ classes;
+- tables as Markdown tables when simple;
+- images as exported assets referenced by Markdown image syntax;
+- headers, footers, and page numbers as page furniture;
+- comments, speaker notes, and review metadata as sidecar artifacts;
+- lossy import diagnostics for unsupported or simplified source features.
+
+### 6.3. Required components
+
+| Component | Purpose |
+|---|---|
+| `@mdpp/import-office` | Convert Office-like sources to semantic md++ and sidecars. |
+| `@mdpp/presentation-resolver` | Resolve generated classes, theme declarations, and page furniture. |
+| `@mdpp/diagnostics` | Emit stable lossy-import diagnostics. |
+| `@mdpp/schemas` | Validate generated artifacts and sidecars. |
+
+<!-- END mdpp-office-pipeline-update-v0-14: application-profiles -->

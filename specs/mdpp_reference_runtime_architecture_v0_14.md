@@ -1927,3 +1927,31 @@ These are host responsibilities or implementation choices. The architecture defi
 ## 10. Changes in draft 0.14
 
 Draft 0.14 adds conformance language, a JSON-RPC worker IPC/RPC profile, plugin manifests, lifecycle event hooks, repository canonicalization rules, patch/update invariants, layout interpretation and area rendering as plugin-owned concerns, a default dispatch table, references to the separate diagnostic catalog, and references to the JSON Schema skeleton.
+
+<!-- BEGIN mdpp-office-pipeline-update-v0-14: runtime -->
+
+## Addendum: Office import, sidecars, theme declarations, and page furniture
+
+This runtime addendum extends the v0.14 reference architecture with exchange responsibilities for the Office-normalization pipeline.
+
+An Office-like importer is a lossy semantic transformation:
+
+```text
+office.docx | office.pptx -> mdpp.source + mdpp.comment-sidecar? + diagnostics
+```
+
+The importer should produce semantic md++ source first. It should not encode the full Office object model as custom inline syntax. Named source styles should become attribute-list classes when safe. Comments, review notes, speaker notes, and traceability metadata should become `mdpp.comment-sidecar` artifacts associated with the generated md++ document.
+
+The presentation resolver should expose theme tokens, class declarations, component declarations, page-furniture profiles, assets, stylesheets, and plugin defaults as a single `mdpp.presentation-context` artifact. The layout interpreter chooses active page furniture after the active layout and theme are known. The paginator resolves `{page.number}` and `{page.count}` after page generation.
+
+Recommended additional document types:
+
+| Type | Meaning |
+|---|---|
+| `office.docx` | Input DOCX-like source artifact |
+| `office.pptx` | Input PPTX-like source artifact |
+| `mdpp.comment-sidecar` | Imported comments, speaker notes, review notes, and traceability metadata |
+
+Import diagnostics should use `MDPP0700`-range codes. Page-furniture and richer-theme diagnostics should use `MDPP0413`-`MDPP0418`.
+
+<!-- END mdpp-office-pipeline-update-v0-14: runtime -->

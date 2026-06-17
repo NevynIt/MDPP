@@ -87,6 +87,104 @@
         },
         "capability": {
           "type": "string"
+        },
+        "importFeature": {
+          "type": "string"
+        },
+        "styleClass": {
+          "type": "string"
+        },
+        "pageFurniture": {
+          "type": "string"
+        }
+      }
+    },
+    "MdPageFurnitureSlot": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "slot": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "resolvedValue": {
+          "type": "string"
+        },
+        "origin": {
+          "$ref": "#/$defs/MdSourceOrigin"
+        }
+      }
+    },
+    "MdPageFurnitureProfile": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "slots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MdPageFurnitureSlot"
+          }
+        },
+        "origin": {
+          "$ref": "#/$defs/MdSourceOrigin"
+        }
+      }
+    },
+    "MdImportedComment": {
+      "type": "object",
+      "required": [
+        "id",
+        "target",
+        "text"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "created": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "resolved": {
+          "type": "boolean"
+        },
+        "origin": {
+          "$ref": "#/$defs/MdSourceOrigin"
+        }
+      }
+    },
+    "MdOfficeImportSidecar": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "source": {
+          "type": "string"
+        },
+        "comments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MdImportedComment"
+          }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MdDiagnostic"
+          }
         }
       }
     },
@@ -626,6 +724,15 @@
           "items": {
             "$ref": "#/$defs/MdDiagnostic"
           }
+        },
+        "sidecars": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MdOfficeImportSidecar"
+          }
+        },
+        "pageFurniture": {
+          "$ref": "#/$defs/MdPageFurnitureProfile"
         },
         "patches": {
           "type": "array"

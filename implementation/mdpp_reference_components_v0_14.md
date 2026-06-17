@@ -492,3 +492,49 @@ Before implementing application shells, stabilize these interfaces:
 7. interaction binding and event payload shape;
 8. source map query API;
 9. layout/page model artifact shape.
+
+<!-- BEGIN mdpp-office-pipeline-update-v0-14: components -->
+
+## 12. Office import and page-furniture component additions
+
+The Office-normalization update adds these implementation responsibilities.
+
+### `@mdpp/types`
+
+Additional responsibilities:
+
+- page-furniture profile and slot types;
+- theme class/component declaration types;
+- comment/review sidecar types;
+- import diagnostic metadata fields.
+
+### `@mdpp/import-office`
+
+Coordinates lossy Office-like import into semantic md++.
+
+Responsibilities:
+
+- read DOCX/PPTX-like source artifacts through host-approved providers;
+- map headings, paragraphs, lists, tables, images, named styles, headers, footers, and page numbers into md++ resources;
+- extract comments, speaker notes, and review metadata to sidecar artifacts;
+- emit `MDPP0700`-range diagnostics for lossy or unsupported features;
+- preserve source-origin and traceability metadata where possible.
+
+### `@mdpp/presentation-resolver`
+
+Additional responsibilities:
+
+- resolve theme-defined style classes;
+- resolve theme-defined components;
+- resolve page-furniture profiles;
+- expose generated page-furniture values to layout/export components.
+
+### `@mdpp/layout-engine` and exporters
+
+Additional responsibilities:
+
+- attach active page-furniture profiles to page-model artifacts;
+- resolve page numbers and page counts after pagination;
+- emit `MDPP0416`, `MDPP0417`, and `MDPP0418` when page-furniture references cannot be resolved.
+
+<!-- END mdpp-office-pipeline-update-v0-14: components -->

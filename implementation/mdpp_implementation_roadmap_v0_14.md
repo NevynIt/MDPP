@@ -221,3 +221,28 @@ The following should remain explicit TODOs until implementation experience exist
 - reversible transformations for visual editing;
 - pixel-level rendering conformance;
 - plugin marketplace/package distribution rules.
+
+<!-- BEGIN mdpp-office-pipeline-update-v0-14: roadmap -->
+
+## 11. Milestone 6A: Office import normalization
+
+Goal: make DOCX/PPTX-like inputs usable as semantic md++ source without pretending the conversion is lossless.
+
+Deliverables:
+
+- Office-like import provider skeleton;
+- style-name to md++ class normalization;
+- image extraction to assets;
+- comment/review sidecar extraction;
+- page furniture extraction for headers, footers, and page numbers;
+- `MDPP0700`-range diagnostics for lossy import cases;
+- examples `75` through `77` as normalized-output fixtures.
+
+Exit criteria:
+
+- a normal report-like DOCX can be converted to readable md++;
+- comments and review notes are preserved as sidecar metadata;
+- unsupported Office features produce stable diagnostic codes;
+- generated md++ can still be rendered by the normal HTML/PDF pipeline.
+
+<!-- END mdpp-office-pipeline-update-v0-14: roadmap -->

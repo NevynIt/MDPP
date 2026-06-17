@@ -30,3 +30,18 @@ This bundle carries forward the v0.13 language/runtime specifications as draft 0
 - implementation roadmap and milestones;
 - clear separation between language semantics, runtime architecture, plugin behavior, and application shells;
 - compliance-oriented example suite with expected returns and diagnostic codes.
+
+<!-- BEGIN mdpp-office-pipeline-update-v0-14: release-notes -->
+
+## Additive Office-normalization update
+
+This update extends the draft with:
+
+- richer theme files using token groups, `## class`, `## component`, and `## page-furniture` declarations;
+- page furniture for headers, footers, and page numbers;
+- Office-like import guidance for DOCX/PPTX -> md++ normalization;
+- sidecar conventions for imported comments and review metadata;
+- diagnostic codes `MDPP0413`-`MDPP0418` and `MDPP0700`-`MDPP0705`;
+- compliance fixtures `71` through `77`.
+
+<!-- END mdpp-office-pipeline-update-v0-14: release-notes -->

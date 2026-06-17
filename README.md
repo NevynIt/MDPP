@@ -47,3 +47,18 @@ The implementation documents are organized around three targets:
 - Node.js CLI for HTML/PDF export;
 - React-compatible viewer that can run from `file://` using supplied resources or bundles;
 - future visual editor, currently treated as experimental.
+
+<!-- BEGIN mdpp-office-pipeline-update-v0-14: readme -->
+
+## Office import and richer theme update
+
+The v0.14 draft bundle also includes an additive Office-normalization update:
+
+- richer theme declarations for author-facing classes, components, and page furniture;
+- page-furniture conventions for headers, footers, and page numbers;
+- Office-like DOCX/PPTX normalization into text-editable md++;
+- sidecar guidance for imported comments and review metadata;
+- stable diagnostic codes for page furniture and lossy import cases;
+- compliance examples `71` through `77`.
+
+<!-- END mdpp-office-pipeline-update-v0-14: readme -->

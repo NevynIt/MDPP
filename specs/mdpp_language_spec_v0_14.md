@@ -1976,3 +1976,115 @@ line: 42
 layout: "layout-two-columns"
 area: "right"
 ```
+
+<!-- BEGIN mdpp-office-pipeline-update-v0-14: language -->
+
+## Appendix: Office import, richer theme resources, and page furniture
+
+This appendix records the v0.14 draft update for lossy Office-like import, richer theme files, style classes, component declarations, and page furniture. It is deliberately written as an additive section so it can be applied safely to existing draft repositories and later folded into the numbered chapters.
+
+### Richer theme resources
+
+Theme files remain Markdown resources. A portable theme may use Markdown headings as declaration groups and key/value declarations inside each group.
+
+Recommended heading forms:
+
+```markdown
+## colors
+primary: #204080
+accent: #f0a000
+
+## fonts
+body: Aptos, Arial, sans-serif
+heading: Aptos Display, Aptos, sans-serif
+
+## spacing
+small: 0.25rem
+medium: 0.75rem
+large: 1.5rem
+
+## class lead
+font-size: 1.15em
+line-height: 1.45
+
+## class callout-warning
+background: #fff6db
+border-color: {{colors.accent}}
+padding: {{spacing.medium}}
+
+## component table
+border: 1px solid {{colors.border}}
+header-background: {{colors.primary}}
+header-color: white
+
+## page-furniture report
+header-left: {{document.title}}
+header-right: {{page.number}}
+footer-center: Confidential
+number-format: {{page.number}} / {{page.count}}
+```
+
+The portable heading kinds are:
+
+| Heading form | Meaning |
+|---|---|
+| `## colors`, `## fonts`, `## spacing`, and similar token groups | Design token groups |
+| `## class NAME` | Visual treatment for author-facing class `.NAME` |
+| `## component NAME` | Defaults for common renderer/document components |
+| `## page-furniture NAME` | Reusable header, footer, and page-numbering defaults |
+| `## plugin NAME` | Defaults for a plugin-owned renderer |
+| `## assets` and `## font-assets` | Theme-owned resource references |
+
+The theme vocabulary is a convenience layer above CSS. Theme declarations should cover common document-design intent. CSS remains the escape hatch for selectors, pseudo-elements, media queries, animations, advanced print behavior, and host-specific output features.
+
+### Style classes
+
+Attribute-list classes such as `{.lead}` or `{.callout-warning}` are portable author-facing style classes. A Word or PowerPoint importer should map safe named source styles to classes rather than embedding source application style objects in the body.
+
+Example:
+
+```markdown
+# Imported report {{.word-style-title}}
+
+This paragraph came from a Word style named "Executive Summary". {{.word-style-executive-summary}}
+```
+
+Theme and stylesheet resources define what these classes mean visually. Unknown classes should remain in the Markdown and may produce diagnostics only when a selected profile requires class declarations.
+
+### Page furniture
+
+Page furniture is repeated page-level generated content such as headers, footers, page numbers, and report metadata. Layouts may select a page-furniture profile by name. Themes define the profile.
+
+Portable slots are:
+
+| Slot | Meaning |
+|---|---|
+| `header-left`, `header-center`, `header-right` | Header content |
+| `footer-left`, `footer-center`, `footer-right` | Footer content |
+| `number-format` | Page-number text pattern |
+| `first-page` | `same`, `different`, or `none` |
+
+Portable generated values are `{document.title}`, `{document.status}`, `{section.title}`, `{page.number}`, and `{page.count}`. Page numbers and counts are resolved after pagination. If `{page.count}` is unavailable for streaming or interactive output, the host should leave it empty or use a documented placeholder and report `MDPP0418`.
+
+### Office-like import and sidecar metadata
+
+md++ may be used as a semantic normalization target for DOCX, PPTX, or similar visual office formats. Import is intentionally lossy.
+
+Recommended mapping:
+
+| Office-like source feature | md++ target |
+|---|---|
+| Body paragraphs | Markdown paragraphs with style classes when useful |
+| Heading styles | Markdown headings |
+| Named paragraph/character styles | Attribute-list classes |
+| Tables | Markdown tables when simple; plugin/component blocks when complex |
+| Images | Asset files referenced by Markdown images |
+| Headers, footers, page numbers | Theme/layout page furniture |
+| Comments, review notes, speaker notes | Sidecar metadata |
+| Unrepresentable freeform layout, SmartArt, charts, embedded objects, macros | Static asset, placeholder, omission, or diagnostic |
+
+Comments and review notes should normally be stored outside the md++ body in a sidecar file such as `root.md.comments.yaml` or `root.md.comments.json`. Targets should prefer explicit anchors when available and may fall back to source-origin ranges or generated block identifiers.
+
+Importers should emit diagnostics from the `MDPP0700` range for unsupported or degraded source features.
+
+<!-- END mdpp-office-pipeline-update-v0-14: language -->

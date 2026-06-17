@@ -39,6 +39,10 @@ This manifest turns the language spec, diagnostic catalog, and compliance scenar
 - Invalid flow target or cycle: `MDPP0409`, `MDPP0410`
 - Unsupported area renderer: `MDPP0411`
 - Unknown token reference: `MDPP0412`
+- Theme class/component/page-furniture issues: `MDPP0414`, `MDPP0415`, `MDPP0416`, `MDPP0417`, `MDPP0418`
+- Lossy Office-like import: `MDPP0700`, `MDPP0703`, `MDPP0704`
+- Imported style/comment mapping: `MDPP0701`, `MDPP0702`
+- Import sidecar resolution or anchoring: `MDPP0705`
 
 ## Fixture expectations
 
@@ -114,3 +118,10 @@ This manifest turns the language spec, diagnostic catalog, and compliance scenar
 | 68 | `68-plugin-defaults-from-theme` | Passes theme-provided defaults to the DOT render plugin. | none |
 | 69 | `69-block-attributes-override-plugin-defaults` | Uses block attributes to override theme-provided plugin defaults. | none |
 | 70 | `70-complete-minimal-document` | Resolves the integrated document: requirements, repository, theme, layout, stylesheet, include, math, Mermaid, DOT model, DOT render, and page layout. | none |
+| 71 | `71-theme-class-declarations` | Applies theme-defined class declarations to author-facing classes. | none |
+| 72 | `72-theme-component-declarations` | Applies theme-defined component defaults to tables and figures. | none |
+| 73 | `73-page-furniture-report-layout` | Applies layout-selected report page furniture for headers, footers, and page numbers. | none |
+| 74 | `74-unknown-page-furniture-diagnostic` | Reports a layout selecting a page-furniture profile that the active theme does not define. | MDPP0416 |
+| 75 | `75-office-import-style-classes` | Shows Word/PPT-style named styles normalized into md++ classes. | MDPP0701 ×2 |
+| 76 | `76-office-comments-sidecar` | Keeps imported comments in a sidecar file targeted at anchors in the main document. | MDPP0702 |
+| 77 | `77-lossy-office-import-diagnostics` | Reports lossy import cases for freeform positioning, embedded objects, and precise pagination. | MDPP0700, MDPP0703, MDPP0704 |

@@ -33,3 +33,11 @@ The suite assumes only the minimum proof plugins needed by the fixtures:
 - `area.flow`
 
 Everything else should remain core-host behavior.
+
+<!-- BEGIN mdpp-office-pipeline-update-v0-14: examples-readme -->
+
+## Office-normalization fixtures
+
+Examples `71` through `77` cover richer theme declarations, page furniture, and normalized Office-like import output. Examples `75` through `77` describe already-imported md++ output and the diagnostics an Office-like importer should have produced. They do not require DOCX/PPTX binary fixtures.
+
+<!-- END mdpp-office-pipeline-update-v0-14: examples-readme -->
