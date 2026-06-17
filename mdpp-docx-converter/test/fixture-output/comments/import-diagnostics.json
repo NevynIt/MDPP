@@ -1,0 +1,8 @@
+[
+  {
+    "code": "MDPP0420",
+    "severity": "warning",
+    "message": "Drawing without image relationship was skipped.",
+    "wordPart": "word/document.xml"
+  }
+]

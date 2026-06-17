@@ -1,0 +1,42 @@
+{
+  "type": "mdpp.comments.sidecar",
+  "version": "0.1",
+  "comments": [
+    {
+      "id": "0",
+      "author": "md++ Fixture Reviewer",
+      "date": "2026-06-17T19:42:16Z",
+      "text": "Exporter should map this paragraph style to a safe md++ class and preserve this comment in a sidecar metadata file.",
+      "anchors": [
+        {
+          "id": "word-comment-0",
+          "paragraphIndex": 16
+        }
+      ]
+    },
+    {
+      "id": "1",
+      "author": "md++ Fixture Reviewer",
+      "date": "2026-06-17T19:42:16Z",
+      "text": "Exporter should not silently flatten this complex table into GFM when merged-cell structure would be lost.",
+      "anchors": [
+        {
+          "id": "word-comment-1",
+          "paragraphIndex": 51
+        }
+      ]
+    },
+    {
+      "id": "2",
+      "author": "md++ Fixture Reviewer",
+      "date": "2026-06-17T19:42:16Z",
+      "text": "Exporter should emit a placeholder, static asset, omission, or MDPP0700-range diagnostic for this freeform object.",
+      "anchors": [
+        {
+          "id": "word-comment-2",
+          "paragraphIndex": 72
+        }
+      ]
+    }
+  ]
+}

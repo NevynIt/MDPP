@@ -1,0 +1,75 @@
+:root {
+  --mdpp-color-text: #111111;
+  --mdpp-color-background: #ffffff;
+  --mdpp-color-accent: #2f5597;
+  --mdpp-font-body: Calibri, Arial, sans-serif;
+  --mdpp-font-heading: Calibri, Arial, sans-serif;
+}
+
+.mdpp-document {
+  color: var(--mdpp-color-text);
+  background: var(--mdpp-color-background);
+  font-family: var(--mdpp-font-body);
+  line-height: 1.45;
+}
+
+.mdpp-document h1,
+.mdpp-document h2,
+.mdpp-document h3,
+.mdpp-document h4,
+.mdpp-document h5,
+.mdpp-document h6 {
+  font-family: var(--mdpp-font-heading);
+}
+
+.mdpp-document .word-image {
+  max-width: 100%;
+  height: auto;
+}
+
+.mdpp-document .word-comment-anchor {
+  display: inline;
+}
+.mdpp-document .word-style-caption {
+  /* Word style class imported from DOCX. Refine in the theme/CSS layer. */
+}
+
+.mdpp-document .word-style-executive-summary {
+  /* Word style class imported from DOCX. Refine in the theme/CSS layer. */
+}
+
+.mdpp-document .word-style-heading-1 {
+  /* Word style class imported from DOCX. Refine in the theme/CSS layer. */
+}
+
+.mdpp-document .word-style-list-bullet {
+  /* Word style class imported from DOCX. Refine in the theme/CSS layer. */
+}
+
+.mdpp-document .word-style-list-bullet-2 {
+  /* Word style class imported from DOCX. Refine in the theme/CSS layer. */
+}
+
+.mdpp-document .word-style-list-number {
+  /* Word style class imported from DOCX. Refine in the theme/CSS layer. */
+}
+
+.mdpp-document .word-style-mdpp-callout-warning {
+  /* Word style class imported from DOCX. Refine in the theme/CSS layer. */
+}
+
+.mdpp-document .word-style-mdpp-code-block {
+  /* Word style class imported from DOCX. Refine in the theme/CSS layer. */
+}
+
+.mdpp-document .word-style-mdpp-lead {
+  /* Word style class imported from DOCX. Refine in the theme/CSS layer. */
+}
+
+.mdpp-document .word-style-quote {
+  /* Word style class imported from DOCX. Refine in the theme/CSS layer. */
+}
+
+.mdpp-document .word-style-spec-note {
+  /* Word style class imported from DOCX. Refine in the theme/CSS layer. */
+}
