@@ -18,6 +18,8 @@ Private Const DEFAULT_THEME_FILE As String = "./themes/word-import.theme.md"
 Private Const DEFAULT_LAYOUT_FILE As String = "./layouts/word-report.layout.md"
 Private Const DEFAULT_STYLESHEET_FILE As String = "./styles/mdpp-word-base.css"
 
+Private mExportStartTime As Single
+
 Public Sub ExportActiveDocumentToMdpp()
     If ActiveDocument Is Nothing Then
         MsgBox "No active document.", vbExclamation
@@ -36,8 +38,10 @@ Public Sub ExportActiveDocumentToMdppFolder(ByVal exportRoot As String)
 
     Dim doc As Document
     Set doc = ActiveDocument
+    BeginExportStatus doc.Name
 
     Dim fso As Object
+    ExportStatus "Preparing output folders"
     Set fso = CreateObject("Scripting.FileSystemObject")
 
     exportRoot = Trim$(exportRoot)
@@ -62,36 +66,45 @@ Public Sub ExportActiveDocumentToMdppFolder(ByVal exportRoot As String)
 
     Dim imageFiles As Collection
     Set imageFiles = New Collection
+    ExportStatus "Extracting image assets"
     ExtractImagesViaFilteredHtml doc, exportRoot, imageFiles, diagnostics
     YieldToWordUi
 
+    ExportStatus "Collecting Word paragraph styles"
     CollectUsedParagraphStyles doc, usedStyles
     YieldToWordUi
 
     Dim rootMd As String
+    ExportStatus "Building root Markdown"
     rootMd = BuildRootMarkdown(doc, imageFiles, usedStyles, generatedStyles, diagnostics)
     YieldToWordUi
 
     Dim themeMd As String
+    ExportStatus "Building theme"
     themeMd = BuildThemeMarkdown(doc, usedStyles, generatedStyles)
     YieldToWordUi
 
     Dim layoutMd As String
+    ExportStatus "Building layout"
     layoutMd = BuildLayoutMarkdown(doc)
     YieldToWordUi
 
     Dim css As String
+    ExportStatus "Building CSS"
     css = BuildStandardCss(doc, usedStyles, generatedStyles)
     YieldToWordUi
 
     Dim commentsJson As String
+    ExportStatus "Writing comments sidecar"
     commentsJson = BuildCommentsSidecarJson(doc)
     YieldToWordUi
 
     Dim diagnosticsJson As String
+    ExportStatus "Writing diagnostics sidecar"
     diagnosticsJson = BuildImportDiagnosticsJson(doc, diagnostics)
     YieldToWordUi
 
+    ExportStatus "Writing export files"
     WriteUtf8 fso.BuildPath(exportRoot, "root.md"), rootMd
     WriteUtf8 fso.BuildPath(fso.BuildPath(exportRoot, "themes"), "word-import.theme.md"), themeMd
     WriteUtf8 fso.BuildPath(fso.BuildPath(exportRoot, "layouts"), "word-report.layout.md"), layoutMd
@@ -99,10 +112,14 @@ Public Sub ExportActiveDocumentToMdppFolder(ByVal exportRoot As String)
     WriteUtf8 fso.BuildPath(fso.BuildPath(exportRoot, "comments"), "comments.sidecar.json"), commentsJson
     WriteUtf8 fso.BuildPath(fso.BuildPath(exportRoot, "comments"), "import-diagnostics.json"), diagnosticsJson
 
+    ExportStatus "Completed"
+    EndExportStatus
     MsgBox "md++ export completed:" & vbCrLf & exportRoot, vbInformation
     Exit Sub
 
 Fail:
+    ExportStatus "Failed: " & Err.Description
+    EndExportStatus
     MsgBox "md++ export failed: " & Err.Description, vbCritical
 End Sub
 
@@ -124,6 +141,48 @@ Private Function PickExportFolder() As String
 Fail:
     PickExportFolder = InputBox("Enter export folder path:", "md++ export")
 End Function
+
+Private Sub BeginExportStatus(ByVal sourceName As String)
+    mExportStartTime = Timer
+    Debug.Print "md++ Word export started: " & sourceName
+    ExportStatus "Starting"
+End Sub
+
+Private Sub ExportStatus(ByVal message As String)
+    On Error Resume Next
+    Dim line As String
+    line = "md++ export [" & FormatNumberInvariant(ElapsedExportSeconds(), 1) & "s] " & message
+    Debug.Print line
+    Application.StatusBar = line
+    YieldToWordUi
+End Sub
+
+Private Sub ExportProgress(ByVal stageName As String, ByVal currentValue As Long, ByVal totalValue As Long, ByVal interval As Long)
+    If currentValue <= 0 Then Exit Sub
+    If interval <= 0 Then interval = 50
+    If currentValue = totalValue Or currentValue Mod interval = 0 Then
+        If totalValue > 0 Then
+            ExportStatus stageName & " " & CStr(currentValue) & "/" & CStr(totalValue)
+        Else
+            ExportStatus stageName & " " & CStr(currentValue)
+        End If
+    End If
+End Sub
+
+Private Function ElapsedExportSeconds() As Double
+    Dim nowValue As Single
+    nowValue = Timer
+    If nowValue >= mExportStartTime Then
+        ElapsedExportSeconds = nowValue - mExportStartTime
+    Else
+        ElapsedExportSeconds = (86400# - mExportStartTime) + nowValue
+    End If
+End Function
+
+Private Sub EndExportStatus()
+    On Error Resume Next
+    Application.StatusBar = False
+End Sub
 
 Private Sub YieldToWordUi()
     On Error Resume Next
@@ -155,7 +214,10 @@ Private Function BuildRootMarkdown(ByVal doc As Document, ByVal imageFiles As Co
 
     If doc.Shapes.Count > 0 Then
         Dim shp As Shape
+        Dim shapeIndex As Long
         For Each shp In doc.Shapes
+            shapeIndex = shapeIndex + 1
+            ExportProgress "Scanning floating shapes", shapeIndex, doc.Shapes.Count, 10
             YieldToWordUi
             AddDiagnostic diagnostics, "Floating shape is not placed in source order. Convert important floating shapes to inline pictures before export, or review the assets manually.", "BuildRootMarkdown", "doc.Shapes traversal", ShapeAnchorRange(shp), doc.Name, "shape", ShapeDiagnosticIndex(shp), 0, ""
         Next shp
@@ -187,8 +249,13 @@ Private Function BuildRootMarkdown(ByVal doc As Document, ByVal imageFiles As Co
     inlineShapeOrdinal = 0
 
     Dim p As Paragraph
+    Dim paragraphIndex As Long
+    Dim paragraphCount As Long
     Dim paragraphYieldCounter As Long
+    paragraphCount = mainRange.Paragraphs.Count
     For Each p In mainRange.Paragraphs
+        paragraphIndex = paragraphIndex + 1
+        ExportProgress "Building root Markdown paragraphs", paragraphIndex, paragraphCount, 25
         YieldToWordUiEvery paragraphYieldCounter, 10
 
         Do While nextTable <= tables.Count
@@ -198,6 +265,7 @@ Private Function BuildRootMarkdown(ByVal doc As Document, ByVal imageFiles As Co
             ' VBA does not short-circuit And, so keep the bounds check separate from table indexing.
             If pendingTable.Range.Start > p.Range.Start Then Exit Do
 
+            ExportStatus "Converting table " & CStr(nextTable) & "/" & CStr(tables.Count)
             sb = sb & TableToMarkdown(doc, pendingTable, diagnostics) & vbCrLf & vbCrLf
             nextTable = nextTable + 1
         Loop
@@ -216,6 +284,7 @@ Private Function BuildRootMarkdown(ByVal doc As Document, ByVal imageFiles As Co
             For Each ils In p.Range.InlineShapes
                 YieldToWordUi
                 inlineShapeOrdinal = inlineShapeOrdinal + 1
+                ExportProgress "Emitting inline images", inlineShapeOrdinal, inlineShapeCount, 5
 
                 Dim imagesForAnchor As Long
                 imagesForAnchor = ImagesToEmitForAnchor(imageIndex, imageFiles.Count, inlineShapeOrdinal, inlineShapeCount)
@@ -236,6 +305,7 @@ Private Function BuildRootMarkdown(ByVal doc As Document, ByVal imageFiles As Co
 
     Do While nextTable <= tables.Count
         YieldToWordUi
+        ExportStatus "Converting trailing table " & CStr(nextTable) & "/" & CStr(tables.Count)
         sb = sb & TableToMarkdown(doc, tables(nextTable), diagnostics) & vbCrLf & vbCrLf
         nextTable = nextTable + 1
     Loop
@@ -308,6 +378,8 @@ End Function
 Private Function TableToMarkdown(ByVal doc As Document, ByVal tbl As Table, ByVal diagnostics As Collection) As String
     On Error GoTo Fail
 
+    ExportStatus "Reading table at start " & CStr(tbl.Range.Start)
+
     Dim rowsCount As Long
     Dim colsCount As Long
     rowsCount = tbl.Rows.Count
@@ -336,6 +408,7 @@ Private Function TableToMarkdown(ByVal doc As Document, ByVal tbl As Table, ByVa
 
     If rowsCount >= 2 Then
         For r = 2 To rowsCount
+            ExportProgress "Converting table rows", r, rowsCount, 10
             YieldToWordUiEvery cellYieldCounter, 10
             For c = 1 To colsCount
                 YieldToWordUiEvery cellYieldCounter, 10
@@ -355,6 +428,7 @@ End Function
 
 Private Function CellTextMarkdown(ByVal doc As Document, ByVal tbl As Table, ByVal rowIndex As Long, ByVal colIndex As Long, ByVal diagnostics As Collection) As String
     On Error GoTo Fail
+    If rowIndex Mod 10 = 0 And colIndex = 1 Then ExportStatus "Reading table row " & CStr(rowIndex)
 
     Dim cellRange As Range
     Set cellRange = tbl.Cell(rowIndex, colIndex).Range.Duplicate

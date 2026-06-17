@@ -1,0 +1,13 @@
+<!doctype html>
+<html>
+  <head><meta charset="utf-8"><title>md++ DOCX import demo</title></head>
+  <body>
+    <input id="file" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+    <pre id="out"></pre>
+    <script type="module">
+      // After building and bundling this package in a web app:
+      // import { convertDocxToMdpp } from "@mdpp/docx-importer";
+      document.getElementById("out").textContent = "Use this file as a template for a Vite/React demo.";
+    </script>
+  </body>
+</html>

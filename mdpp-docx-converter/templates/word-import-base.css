@@ -1,0 +1,23 @@
+:root {
+  --mdpp-color-text: #111111;
+  --mdpp-color-background: #ffffff;
+  --mdpp-color-accent: #2f5597;
+  --mdpp-font-body: Calibri, Arial, sans-serif;
+  --mdpp-font-heading: Calibri, Arial, sans-serif;
+}
+
+.mdpp-document {
+  color: var(--mdpp-color-text);
+  background: var(--mdpp-color-background);
+  font-family: var(--mdpp-font-body);
+  line-height: 1.45;
+}
+
+.mdpp-document .word-image {
+  max-width: 100%;
+  height: auto;
+}
+
+.mdpp-document .word-comment-anchor {
+  display: inline;
+}

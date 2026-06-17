@@ -1,0 +1,39 @@
+﻿{
+  "format": "mdpp.office-comments.sidecar.v0",
+  "source": {
+    "name": "mdpp_word_export_fixture.docx",
+    "title": "md++ Word Export Fixture"
+  },
+  "comments": [
+    {
+      "id": 1,
+      "author": "md++ Fixture Reviewer",
+      "initials": "",
+      "date": "2026-06-17T19:42:00",
+      "sourceStart": 1136,
+      "sourceEnd": 1307,
+      "scopeText": "COMMENT_TARGET_STYLE_CLASS: This warning callout tests a named paragraph style that should map to {.callout-warning}. Unknown classes should remain in the Markdown source.",
+      "commentText": "Exporter should map this paragraph style to a safe md++ class and preserve this comment in a sidecar metadata file."
+    },
+    {
+      "id": 2,
+      "author": "md++ Fixture Reviewer",
+      "initials": "",
+      "date": "2026-06-17T19:42:00",
+      "sourceStart": 4076,
+      "sourceEnd": 4246,
+      "scopeText": "COMMENT_TARGET_TABLE: The next table deliberately uses merged cells and nested-looking content. It should not be forced into a plain GFM table if structure would be lost.",
+      "commentText": "Exporter should not silently flatten this complex table into GFM when merged-cell structure would be lost."
+    },
+    {
+      "id": 3,
+      "author": "md++ Fixture Reviewer",
+      "initials": "",
+      "date": "2026-06-17T19:42:00",
+      "sourceStart": 6014,
+      "sourceEnd": 6190,
+      "scopeText": "COMMENT_TARGET_UNSUPPORTED: The text box above is an unsupported freeform object test. Exporter should emit a static asset, placeholder, omission, or MDPP0700-range diagnostic.",
+      "commentText": "Exporter should emit a placeholder, static asset, omission, or MDPP0700-range diagnostic for this freeform object."
+    }
+  ]
+}

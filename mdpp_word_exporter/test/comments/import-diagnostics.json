@@ -1,0 +1,167 @@
+﻿{
+  "format": "mdpp.office-import-diagnostics.v0",
+  "source": "mdpp_word_export_fixture.docx",
+  "diagnostics": [
+    {
+      "severity": "warning",
+      "code": "MDPP0421",
+      "message": "Floating shape is not placed in source order. Convert important floating shapes to inline pictures before export, or review the assets manually.",
+      "macro": {
+        "procedure": "BuildRootMarkdown",
+        "step": "doc.Shapes traversal"
+      },
+      "sourceLocation": {
+        "name": "mdpp_word_export_fixture.docx",
+        "kind": "shape",
+        "index": "mdpp_textbox_unsupported",
+        "start": 6010,
+        "end": 6011,
+        "page": 5,
+        "line": 8,
+        "text": ""
+      },
+      "vbaError": {
+        "number": null,
+        "description": ""
+      }
+    },
+    {
+      "severity": "warning",
+      "code": "MDPP0421",
+      "message": "Word filtered HTML exported more image files than Word inline image anchors. The exporter emitted every extracted file in export order, grouped across the available inline image anchors.",
+      "macro": {
+        "procedure": "BuildRootMarkdown",
+        "step": "map extracted image files to inline anchors"
+      },
+      "sourceLocation": {
+        "name": "mdpp_word_export_fixture.docx",
+        "kind": "document",
+        "index": "",
+        "start": null,
+        "end": null,
+        "page": null,
+        "line": null,
+        "text": ""
+      },
+      "vbaError": {
+        "number": null,
+        "description": ""
+      }
+    },
+    {
+      "severity": "warning",
+      "code": "MDPP0421",
+      "message": "Table cell could not be read; the exported table cell was left empty.",
+      "macro": {
+        "procedure": "CellTextMarkdown",
+        "step": "tbl.Cell(1,2)"
+      },
+      "sourceLocation": {
+        "name": "mdpp_word_export_fixture.docx",
+        "kind": "table-cell",
+        "index": "start 4247 end 4537 r1 c2",
+        "start": 4247,
+        "end": 4537,
+        "page": 3,
+        "line": 12,
+        "text": "Complex Word table: merged title row plus mixed contentVertical group (merged cells)CaseExpected md++ targetReasonnested list-like contentcomponent blockGFM cannot preserve merged..."
+      },
+      "vbaError": {
+        "number": null,
+        "description": ""
+      }
+    },
+    {
+      "severity": "warning",
+      "code": "MDPP0421",
+      "message": "Table cell could not be read; the exported table cell was left empty.",
+      "macro": {
+        "procedure": "CellTextMarkdown",
+        "step": "tbl.Cell(1,3)"
+      },
+      "sourceLocation": {
+        "name": "mdpp_word_export_fixture.docx",
+        "kind": "table-cell",
+        "index": "start 4247 end 4537 r1 c3",
+        "start": 4247,
+        "end": 4537,
+        "page": 3,
+        "line": 12,
+        "text": "Complex Word table: merged title row plus mixed contentVertical group (merged cells)CaseExpected md++ targetReasonnested list-like contentcomponent blockGFM cannot preserve merged..."
+      },
+      "vbaError": {
+        "number": null,
+        "description": ""
+      }
+    },
+    {
+      "severity": "warning",
+      "code": "MDPP0421",
+      "message": "Table cell could not be read; the exported table cell was left empty.",
+      "macro": {
+        "procedure": "CellTextMarkdown",
+        "step": "tbl.Cell(1,4)"
+      },
+      "sourceLocation": {
+        "name": "mdpp_word_export_fixture.docx",
+        "kind": "table-cell",
+        "index": "start 4247 end 4537 r1 c4",
+        "start": 4247,
+        "end": 4537,
+        "page": 3,
+        "line": 12,
+        "text": "Complex Word table: merged title row plus mixed contentVertical group (merged cells)CaseExpected md++ targetReasonnested list-like contentcomponent blockGFM cannot preserve merged..."
+      },
+      "vbaError": {
+        "number": null,
+        "description": ""
+      }
+    },
+    {
+      "severity": "warning",
+      "code": "MDPP0421",
+      "message": "Table cell could not be read; the exported table cell was left empty.",
+      "macro": {
+        "procedure": "CellTextMarkdown",
+        "step": "tbl.Cell(3,1)"
+      },
+      "sourceLocation": {
+        "name": "mdpp_word_export_fixture.docx",
+        "kind": "table-cell",
+        "index": "start 4247 end 4537 r3 c1",
+        "start": 4247,
+        "end": 4537,
+        "page": 3,
+        "line": 12,
+        "text": "Complex Word table: merged title row plus mixed contentVertical group (merged cells)CaseExpected md++ targetReasonnested list-like contentcomponent blockGFM cannot preserve merged..."
+      },
+      "vbaError": {
+        "number": null,
+        "description": ""
+      }
+    },
+    {
+      "severity": "warning",
+      "code": "MDPP0421",
+      "message": "Table cell could not be read; the exported table cell was left empty.",
+      "macro": {
+        "procedure": "CellTextMarkdown",
+        "step": "tbl.Cell(4,1)"
+      },
+      "sourceLocation": {
+        "name": "mdpp_word_export_fixture.docx",
+        "kind": "table-cell",
+        "index": "start 4247 end 4537 r4 c1",
+        "start": 4247,
+        "end": 4537,
+        "page": 3,
+        "line": 12,
+        "text": "Complex Word table: merged title row plus mixed contentVertical group (merged cells)CaseExpected md++ targetReasonnested list-like contentcomponent blockGFM cannot preserve merged..."
+      },
+      "vbaError": {
+        "number": null,
+        "description": ""
+      }
+    }
+  ]
+}
