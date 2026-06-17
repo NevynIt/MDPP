@@ -175,7 +175,7 @@ Private Function BuildRootMarkdown(ByVal doc As Document, ByVal imageFiles As Co
             ' VBA does not short-circuit And, so keep the bounds check separate from table indexing.
             If pendingTable.Range.Start > p.Range.Start Then Exit Do
 
-            sb = sb & TableToMarkdown(doc, pendingTable, usedStyles, diagnostics) & vbCrLf & vbCrLf
+            sb = sb & TableToMarkdown(doc, pendingTable, usedStyles, generatedStyles, diagnostics) & vbCrLf & vbCrLf
             nextTable = nextTable + 1
         Loop
 
@@ -211,7 +211,7 @@ Private Function BuildRootMarkdown(ByVal doc As Document, ByVal imageFiles As Co
     Next p
 
     Do While nextTable <= tables.Count
-        sb = sb & TableToMarkdown(doc, tables(nextTable), usedStyles, diagnostics) & vbCrLf & vbCrLf
+        sb = sb & TableToMarkdown(doc, tables(nextTable), usedStyles, generatedStyles, diagnostics) & vbCrLf & vbCrLf
         nextTable = nextTable + 1
     Loop
 
@@ -219,24 +219,28 @@ Private Function BuildRootMarkdown(ByVal doc As Document, ByVal imageFiles As Co
 End Function
 
 Private Function ParagraphToMarkdown(ByVal doc As Document, ByVal p As Paragraph, ByVal usedStyles As Object, ByVal generatedStyles As Object, ByVal diagnostics As Collection) As String
+    Dim styleName As String
+    styleName = StyleNameOfParagraph(p)
+
     Dim txt As String
-    txt = Trim$(InlineRangeToMarkdown(doc, p.Range, diagnostics, "ParagraphToMarkdown", "paragraph inline conversion"))
+    txt = Trim$(InlineRangeToMarkdown(doc, p.Range, usedStyles, generatedStyles, styleName, diagnostics, "ParagraphToMarkdown", "paragraph inline conversion"))
     If Len(txt) = 0 Then
         ParagraphToMarkdown = ""
         Exit Function
     End If
 
-    Dim styleName As String
-    styleName = StyleNameOfParagraph(p)
+    Dim defaultParagraphStyle As String
+    defaultParagraphStyle = DefaultParagraphStyleName(doc, usedStyles)
 
     Dim headingLevel As Long
     headingLevel = HeadingLevelOfParagraph(p)
 
     If headingLevel >= 1 And headingLevel <= 6 Then
         Dim headingClassAttr As String
-        headingClassAttr = ClassAttributeForStyle(styleName, False)
+        headingClassAttr = ClassAttributeForStyle(styleName)
         If IsGenericHeadingStyle(styleName, headingLevel) Then headingClassAttr = ""
-        headingClassAttr = AppendClassAttribute(headingClassAttr, FormattingClassForParagraph(doc, p, styleName, generatedStyles))
+
+        If Len(headingClassAttr) = 0 Then headingClassAttr = AppendClassAttribute(headingClassAttr, FormattingClassForParagraph(doc, p, styleName, generatedStyles))
 
         ParagraphToMarkdown = String$(headingLevel, "#") & " " & txt & InlineAttribute(headingClassAttr)
         Exit Function
@@ -248,9 +252,11 @@ Private Function ParagraphToMarkdown(ByVal doc As Document, ByVal p As Paragraph
     End If
 
     Dim classAttr As String
-    classAttr = ClassAttributeForStyle(styleName, False)
-    If IsGenericParagraphStyle(styleName) Then classAttr = ""
-    classAttr = AppendClassAttribute(classAttr, FormattingClassForParagraph(doc, p, styleName, generatedStyles))
+    If IsDefaultParagraphStyle(styleName, defaultParagraphStyle) Then
+        classAttr = FormattingClassForParagraph(doc, p, defaultParagraphStyle, generatedStyles)
+    Else
+        classAttr = ClassAttributeForStyle(styleName)
+    End If
 
     ParagraphToMarkdown = txt & InlineAttribute(classAttr)
 End Function
@@ -261,7 +267,7 @@ Private Function IsImagePlaceholderMarkdown(ByVal markdownText As String) As Boo
     IsImagePlaceholderMarkdown = (s = "/" Or s = "\/")
 End Function
 
-Private Function TableToMarkdown(ByVal doc As Document, ByVal tbl As Table, ByVal usedStyles As Object, ByVal diagnostics As Collection) As String
+Private Function TableToMarkdown(ByVal doc As Document, ByVal tbl As Table, ByVal usedStyles As Object, ByVal generatedStyles As Object, ByVal diagnostics As Collection) As String
     On Error GoTo Fail
 
     Dim rowsCount As Long
@@ -279,7 +285,7 @@ Private Function TableToMarkdown(ByVal doc As Document, ByVal tbl As Table, ByVa
 
     sb = ""
     For c = 1 To colsCount
-        sb = sb & "| " & MarkdownTableCell(CellTextMarkdown(doc, tbl, 1, c, diagnostics)) & " "
+        sb = sb & "| " & MarkdownTableCell(CellTextMarkdown(doc, tbl, 1, c, usedStyles, generatedStyles, diagnostics)) & " "
     Next c
     sb = sb & "|" & vbCrLf
 
@@ -291,7 +297,7 @@ Private Function TableToMarkdown(ByVal doc As Document, ByVal tbl As Table, ByVa
     If rowsCount >= 2 Then
         For r = 2 To rowsCount
             For c = 1 To colsCount
-                sb = sb & "| " & MarkdownTableCell(CellTextMarkdown(doc, tbl, r, c, diagnostics)) & " "
+                sb = sb & "| " & MarkdownTableCell(CellTextMarkdown(doc, tbl, r, c, usedStyles, generatedStyles, diagnostics)) & " "
             Next c
             sb = sb & "|" & vbCrLf
         Next r
@@ -305,13 +311,13 @@ Fail:
     TableToMarkdown = "<!-- mdpp-import-warning: table could not be converted cleanly. -->"
 End Function
 
-Private Function CellTextMarkdown(ByVal doc As Document, ByVal tbl As Table, ByVal rowIndex As Long, ByVal colIndex As Long, ByVal diagnostics As Collection) As String
+Private Function CellTextMarkdown(ByVal doc As Document, ByVal tbl As Table, ByVal rowIndex As Long, ByVal colIndex As Long, ByVal usedStyles As Object, ByVal generatedStyles As Object, ByVal diagnostics As Collection) As String
     On Error GoTo Fail
 
     Dim cellRange As Range
     Set cellRange = tbl.Cell(rowIndex, colIndex).Range.Duplicate
     StripRangeEndMarks cellRange
-    CellTextMarkdown = Trim$(InlineRangeToMarkdown(doc, cellRange, diagnostics, "CellTextMarkdown", "table cell r" & CStr(rowIndex) & " c" & CStr(colIndex)))
+    CellTextMarkdown = Trim$(InlineRangeToMarkdown(doc, cellRange, usedStyles, generatedStyles, "Normal", diagnostics, "CellTextMarkdown", "table cell r" & CStr(rowIndex) & " c" & CStr(colIndex)))
     Exit Function
 
 Fail:
@@ -355,7 +361,7 @@ Private Function ImagesToEmitForAnchor(ByVal nextImageIndex As Long, ByVal image
     End If
 End Function
 
-Private Function InlineRangeToMarkdown(ByVal doc As Document, ByVal rng As Range, ByVal diagnostics As Collection, ByVal macroProcedure As String, ByVal macroStep As String) As String
+Private Function InlineRangeToMarkdown(ByVal doc As Document, ByVal rng As Range, ByVal usedStyles As Object, ByVal generatedStyles As Object, ByVal baseStyleName As String, ByVal diagnostics As Collection, ByVal macroProcedure As String, ByVal macroStep As String) As String
     On Error GoTo PlainFallback
 
     Dim rr As Range
@@ -368,7 +374,7 @@ Private Function InlineRangeToMarkdown(ByVal doc As Document, ByVal rng As Range
     End If
 
     If rr.Hyperlinks.Count = 0 Then
-        InlineRangeToMarkdown = FormatCharsMarkdown(doc, rr.Start, rr.End, diagnostics, rr, macroProcedure, macroStep & " characters")
+        InlineRangeToMarkdown = FormatCharsMarkdown(doc, rr.Start, rr.End, usedStyles, generatedStyles, baseStyleName, diagnostics, rr, macroProcedure, macroStep & " characters")
         Exit Function
     End If
 
@@ -379,7 +385,7 @@ Private Function InlineRangeToMarkdown(ByVal doc As Document, ByVal rng As Range
     Dim h As Hyperlink
     For Each h In rr.Hyperlinks
         If h.Range.Start > pos Then
-            sb = sb & FormatCharsMarkdown(doc, pos, h.Range.Start, diagnostics, rr, macroProcedure, macroStep & " before hyperlink")
+            sb = sb & FormatCharsMarkdown(doc, pos, h.Range.Start, usedStyles, generatedStyles, baseStyleName, diagnostics, rr, macroProcedure, macroStep & " before hyperlink")
         End If
 
         Dim labelText As String
@@ -406,7 +412,7 @@ Private Function InlineRangeToMarkdown(ByVal doc As Document, ByVal rng As Range
     Next h
 
     If pos < rr.End Then
-        sb = sb & FormatCharsMarkdown(doc, pos, rr.End, diagnostics, rr, macroProcedure, macroStep & " after hyperlink")
+        sb = sb & FormatCharsMarkdown(doc, pos, rr.End, usedStyles, generatedStyles, baseStyleName, diagnostics, rr, macroProcedure, macroStep & " after hyperlink")
     End If
 
     InlineRangeToMarkdown = sb
@@ -417,13 +423,14 @@ PlainFallback:
     InlineRangeToMarkdown = MarkdownEscapeInline(CleanRangeText(rng.Text))
 End Function
 
-Private Function FormatCharsMarkdown(ByVal doc As Document, ByVal startPos As Long, ByVal endPos As Long, ByVal diagnostics As Collection, ByVal sourceRange As Range, ByVal macroProcedure As String, ByVal macroStep As String) As String
+Private Function FormatCharsMarkdown(ByVal doc As Document, ByVal startPos As Long, ByVal endPos As Long, ByVal usedStyles As Object, ByVal generatedStyles As Object, ByVal baseStyleName As String, ByVal diagnostics As Collection, ByVal sourceRange As Range, ByVal macroProcedure As String, ByVal macroStep As String) As String
     On Error GoTo Fail
 
     Dim sb As String
     Dim seg As String
     Dim currentBold As Boolean
     Dim currentItalic As Boolean
+    Dim currentClass As String
     Dim initialized As Boolean
 
     Dim i As Long
@@ -436,20 +443,24 @@ Private Function FormatCharsMarkdown(ByVal doc As Document, ByVal startPos As Lo
         If Len(ch) > 0 Then
             Dim isBold As Boolean
             Dim isItalic As Boolean
+            Dim charClass As String
             isBold = (cr.Font.Bold <> 0)
             isItalic = (cr.Font.Italic <> 0)
+            charClass = CharacterClassForRange(doc, cr, baseStyleName, usedStyles, generatedStyles)
 
             If Not initialized Then
                 initialized = True
                 currentBold = isBold
                 currentItalic = isItalic
+                currentClass = charClass
             End If
 
-            If isBold <> currentBold Or isItalic <> currentItalic Then
-                sb = sb & StyledInlineSegment(seg, currentBold, currentItalic)
+            If isBold <> currentBold Or isItalic <> currentItalic Or charClass <> currentClass Then
+                sb = sb & StyledInlineSegment(seg, currentBold, currentItalic, currentClass)
                 seg = ""
                 currentBold = isBold
                 currentItalic = isItalic
+                currentClass = charClass
             End If
 
             seg = seg & ch
@@ -457,7 +468,7 @@ Private Function FormatCharsMarkdown(ByVal doc As Document, ByVal startPos As Lo
     Next i
 
     If Len(seg) > 0 Then
-        sb = sb & StyledInlineSegment(seg, currentBold, currentItalic)
+        sb = sb & StyledInlineSegment(seg, currentBold, currentItalic, currentClass)
     End If
 
     FormatCharsMarkdown = sb
@@ -468,20 +479,27 @@ Fail:
     FormatCharsMarkdown = ""
 End Function
 
-Private Function StyledInlineSegment(ByVal textValue As String, ByVal isBold As Boolean, ByVal isItalic As Boolean) As String
+Private Function StyledInlineSegment(ByVal textValue As String, ByVal isBold As Boolean, ByVal isItalic As Boolean, ByVal className As String) As String
     Dim escaped As String
     escaped = MarkdownEscapeInline(textValue)
+    Dim rendered As String
 
     If Len(Trim$(escaped)) = 0 Then
-        StyledInlineSegment = escaped
+        rendered = escaped
     ElseIf isBold And isItalic Then
-        StyledInlineSegment = "***" & escaped & "***"
+        rendered = "***" & escaped & "***"
     ElseIf isBold Then
-        StyledInlineSegment = "**" & escaped & "**"
+        rendered = "**" & escaped & "**"
     ElseIf isItalic Then
-        StyledInlineSegment = "*" & escaped & "*"
+        rendered = "*" & escaped & "*"
     Else
-        StyledInlineSegment = escaped
+        rendered = escaped
+    End If
+
+    If Len(className) > 0 And Len(Trim$(rendered)) > 0 Then
+        StyledInlineSegment = "<span class=""" & HtmlAttributeEscape(className) & """>" & rendered & "</span>"
+    Else
+        StyledInlineSegment = rendered
     End If
 End Function
 
@@ -538,6 +556,8 @@ Private Function BuildThemeMarkdown(ByVal doc As Document, ByVal usedStyles As O
 
     Dim keys As Variant
     keys = SortedDictionaryKeys(usedStyles)
+    Dim defaultParagraphStyle As String
+    defaultParagraphStyle = DefaultParagraphStyleName(doc, usedStyles)
 
     Dim i As Long
     For i = LBound(keys) To UBound(keys)
@@ -546,7 +566,7 @@ Private Function BuildThemeMarkdown(ByVal doc As Document, ByVal usedStyles As O
         Dim cls As String
         cls = StyleClassName(styleName)
         If Len(cls) > 0 Then
-            If ShouldEmitStyleClass(styleName) Then
+            If ShouldEmitStyleClass(styleName, defaultParagraphStyle) Then
                 sb = sb & "## class " & cls & vbCrLf
                 sb = sb & ThemePropertiesForStyle(doc, styleName)
                 sb = sb & vbCrLf
@@ -568,23 +588,35 @@ Private Function BuildPageFurnitureTheme(ByVal doc As Document) As String
     footerText = CleanHeaderFooterText(doc.Sections(1).Footers(wdHeaderFooterPrimary).Range)
     On Error GoTo 0
 
+    If Len(headerText) = 0 And Len(footerText) = 0 Then
+        BuildPageFurnitureTheme = ""
+        Exit Function
+    End If
+
     Dim sb As String
     sb = "## page-furniture word-report" & vbCrLf
     If Len(headerText) > 0 Then
         sb = sb & "header-center: " & ThemeValue(headerText) & vbCrLf
-    Else
-        sb = sb & "header-left: {document.title}" & vbCrLf
-        sb = sb & "header-right: {section.title}" & vbCrLf
     End If
 
     If Len(footerText) > 0 Then
         sb = sb & "footer-center: " & ThemeValue(footerText) & vbCrLf
-    Else
-        sb = sb & "footer-center: {page.number} / {page.count}" & vbCrLf
     End If
-    sb = sb & "number-format: {page.number} / {page.count}" & vbCrLf & vbCrLf
+    sb = sb & vbCrLf
 
     BuildPageFurnitureTheme = sb
+End Function
+
+Private Function HasPageFurniture(ByVal doc As Document) As Boolean
+    Dim headerText As String
+    Dim footerText As String
+
+    On Error Resume Next
+    headerText = CleanHeaderFooterText(doc.Sections(1).Headers(wdHeaderFooterPrimary).Range)
+    footerText = CleanHeaderFooterText(doc.Sections(1).Footers(wdHeaderFooterPrimary).Range)
+    On Error GoTo 0
+
+    HasPageFurniture = (Len(headerText) > 0 Or Len(footerText) > 0)
 End Function
 
 Private Function BuildLayoutMarkdown(ByVal doc As Document) As String
@@ -613,7 +645,8 @@ Private Function BuildLayoutMarkdown(ByVal doc As Document) As String
     sb = sb & "orientation: " & orientationText & vbCrLf
     sb = sb & "canvas-padding: " & padTop & " " & padRight & " " & padBottom & " " & padLeft & vbCrLf
     sb = sb & "gap: 0" & vbCrLf
-    sb = sb & "page-furniture: word-report" & vbCrLf & vbCrLf
+    If HasPageFurniture(doc) Then sb = sb & "page-furniture: word-report" & vbCrLf
+    sb = sb & vbCrLf
     sb = sb & "|      | 1fr  |" & vbCrLf
     sb = sb & "|------|------|" & vbCrLf
     sb = sb & "| 1fr  | body |" & vbCrLf & vbCrLf
@@ -683,6 +716,8 @@ Private Function BuildStandardCss(ByVal doc As Document, ByVal usedStyles As Obj
 
     Dim keys As Variant
     keys = SortedDictionaryKeys(usedStyles)
+    Dim defaultParagraphStyle As String
+    defaultParagraphStyle = DefaultParagraphStyleName(doc, usedStyles)
 
     Dim i As Long
     For i = LBound(keys) To UBound(keys)
@@ -691,7 +726,7 @@ Private Function BuildStandardCss(ByVal doc As Document, ByVal usedStyles As Obj
         Dim cls As String
         cls = StyleClassName(styleName)
         If Len(cls) > 0 Then
-            If ShouldEmitStyleClass(styleName) Then
+            If ShouldEmitStyleClass(styleName, defaultParagraphStyle) Then
                 sb = sb & "." & CssIdentifier(cls) & " {" & vbCrLf
                 sb = sb & CssPropertiesForStyle(doc, styleName)
                 sb = sb & "}" & vbCrLf & vbCrLf
@@ -712,11 +747,20 @@ Private Sub CollectUsedParagraphStyles(ByVal doc As Document, ByVal usedStyles A
         If Not p.Range.Information(wdWithInTable) Then
             Dim styleName As String
             styleName = StyleNameOfParagraph(p)
-            If Len(styleName) > 0 Then
-                If Not usedStyles.Exists(styleName) Then usedStyles.Add styleName, True
-            End If
+            AddUsedStyle usedStyles, styleName
         End If
     Next p
+End Sub
+
+Private Sub AddUsedStyle(ByVal usedStyles As Object, ByVal styleName As String)
+    On Error Resume Next
+    If Len(styleName) = 0 Then Exit Sub
+
+    If usedStyles.Exists(styleName) Then
+        usedStyles(styleName) = CLng(usedStyles(styleName)) + 1
+    Else
+        usedStyles.Add styleName, 1
+    End If
 End Sub
 
 Private Function StyleNameOfParagraph(ByVal p As Paragraph) As String
@@ -774,10 +818,8 @@ Fail:
     ListPrefix = "- "
 End Function
 
-Private Function IsGenericParagraphStyle(ByVal styleName As String) As Boolean
-    Dim slug As String
-    slug = Slugify(styleName)
-    IsGenericParagraphStyle = (slug = "normal" Or slug = "body-text")
+Private Function IsDefaultParagraphStyle(ByVal styleName As String, ByVal defaultParagraphStyle As String) As Boolean
+    IsDefaultParagraphStyle = (Slugify(styleName) = Slugify(defaultParagraphStyle))
 End Function
 
 Private Function IsGenericHeadingStyle(ByVal styleName As String, ByVal headingLevel As Long) As Boolean
@@ -788,11 +830,11 @@ Private Function IsGenericHeadingStyle(ByVal styleName As String, ByVal headingL
     End If
 End Function
 
-Private Function ShouldEmitStyleClass(ByVal styleName As String) As Boolean
+Private Function ShouldEmitStyleClass(ByVal styleName As String, ByVal defaultParagraphStyle As String) As Boolean
     Dim slug As String
     slug = Slugify(styleName)
 
-    If slug = "normal" Or slug = "body-text" Then
+    If slug = Slugify(defaultParagraphStyle) Then
         ShouldEmitStyleClass = False
     Else
         ShouldEmitStyleClass = True
@@ -809,7 +851,12 @@ End Function
 Private Function DefaultParagraphStyleName(ByVal doc As Document, ByVal usedStyles As Object) As String
     On Error Resume Next
     If Not usedStyles Is Nothing Then
-        If usedStyles.Exists("Body Text") Then
+        If usedStyles.Exists("Body Text") And usedStyles.Exists("Normal") Then
+            If CLng(usedStyles("Body Text")) > CLng(usedStyles("Normal")) Then
+                DefaultParagraphStyleName = "Body Text"
+                Exit Function
+            End If
+        ElseIf usedStyles.Exists("Body Text") Then
             DefaultParagraphStyleName = "Body Text"
             Exit Function
         End If
@@ -819,12 +866,10 @@ Private Function DefaultParagraphStyleName(ByVal doc As Document, ByVal usedStyl
     DefaultParagraphStyleName = "Normal"
 End Function
 
-Private Function ClassAttributeForStyle(ByVal styleName As String, ByVal includeNormal As Boolean) As String
+Private Function ClassAttributeForStyle(ByVal styleName As String) As String
     Dim cls As String
     cls = StyleClassName(styleName)
     If Len(cls) = 0 Then
-        ClassAttributeForStyle = ""
-    ElseIf Not includeNormal And LCase$(styleName) = "normal" Then
         ClassAttributeForStyle = ""
     Else
         ClassAttributeForStyle = "." & cls
@@ -839,6 +884,78 @@ Private Function AppendClassAttribute(ByVal existingClasses As String, ByVal ext
     Else
         AppendClassAttribute = existingClasses & " " & extraClass
     End If
+End Function
+
+Private Function CharacterClassForRange(ByVal doc As Document, ByVal rng As Range, ByVal baseStyleName As String, ByVal usedStyles As Object, ByVal generatedStyles As Object) As String
+    Dim characterStyleName As String
+    characterStyleName = CharacterStyleNameOfRange(rng)
+
+    If Len(characterStyleName) > 0 Then
+        AddUsedStyle usedStyles, characterStyleName
+        CharacterClassForRange = StyleClassName(characterStyleName)
+        Exit Function
+    End If
+
+    Dim props As String
+    props = CharacterFormattingOverrideProperties(doc, rng, baseStyleName)
+    If Len(props) > 0 Then CharacterClassForRange = GeneratedStyleClassName(generatedStyles, props)
+End Function
+
+Private Function CharacterStyleNameOfRange(ByVal rng As Range) As String
+    On Error GoTo Fail
+
+    Dim st As Style
+    Set st = rng.Style
+
+    If st.Type = wdStyleTypeCharacter Then
+        Dim styleName As String
+        styleName = CStr(st)
+        If IsMeaningfulCharacterStyle(styleName) Then CharacterStyleNameOfRange = styleName
+    End If
+    Exit Function
+
+Fail:
+    CharacterStyleNameOfRange = ""
+End Function
+
+Private Function IsMeaningfulCharacterStyle(ByVal styleName As String) As Boolean
+    Dim slug As String
+    slug = Slugify(styleName)
+    IsMeaningfulCharacterStyle = (Len(slug) > 0 And slug <> "default-paragraph-font" And slug <> "paragraph-font")
+End Function
+
+Private Function CharacterFormattingOverrideProperties(ByVal doc As Document, ByVal rng As Range, ByVal baseStyleName As String) As String
+    Dim sb As String
+    Dim actual As String
+    Dim base As String
+
+    actual = RangeFontName(rng)
+    base = StyleFontName(doc, baseStyleName, "")
+    If Len(actual) > 0 Then
+        If actual <> base Then sb = sb & CssPropertyLine("font-family", CssString(actual))
+    End If
+
+    actual = RangeFontSizeText(rng)
+    base = StyleFontSizeText(doc, baseStyleName)
+    If Len(actual) > 0 Then
+        If actual <> base Then sb = sb & CssPropertyLine("font-size", actual & "pt")
+    End If
+
+    actual = RangeFontColorText(rng)
+    base = StyleFontColorText(doc, baseStyleName)
+    If Len(base) = 0 And actual = "#000000" Then actual = ""
+    If Len(actual) > 0 Then
+        If actual <> base Then sb = sb & CssPropertyLine("color", actual)
+    End If
+
+    actual = RangeBackgroundColorText(rng)
+    base = StyleBackgroundColorText(doc, baseStyleName)
+    If Len(base) = 0 And actual = "#FFFFFF" Then actual = ""
+    If Len(actual) > 0 Then
+        If actual <> base Then sb = sb & CssPropertyLine("background-color", actual)
+    End If
+
+    CharacterFormattingOverrideProperties = sb
 End Function
 
 Private Function FormattingClassForParagraph(ByVal doc As Document, ByVal p As Paragraph, ByVal baseStyleName As String, ByVal generatedStyles As Object) As String
@@ -862,44 +979,6 @@ Private Function ParagraphFormattingOverrideProperties(ByVal doc As Document, By
     Dim sb As String
     Dim actual As String
     Dim base As String
-
-    actual = RangeFontName(rng)
-    base = StyleFontName(doc, baseStyleName, "")
-    If Len(actual) > 0 Then
-        If actual <> base Then sb = sb & CssPropertyLine("font-family", CssString(actual))
-    End If
-
-    actual = RangeFontSizeText(rng)
-    base = StyleFontSizeText(doc, baseStyleName)
-    If Len(actual) > 0 Then
-        If actual <> base Then sb = sb & CssPropertyLine("font-size", actual & "pt")
-    End If
-
-    actual = RangeFontWeightText(rng)
-    base = StyleFontWeightText(doc, baseStyleName)
-    If Len(actual) > 0 Then
-        If actual <> base Then sb = sb & CssPropertyLine("font-weight", actual)
-    End If
-
-    actual = RangeFontStyleText(rng)
-    base = StyleFontStyleText(doc, baseStyleName)
-    If Len(actual) > 0 Then
-        If actual <> base Then sb = sb & CssPropertyLine("font-style", actual)
-    End If
-
-    actual = RangeFontColorText(rng)
-    base = StyleFontColorText(doc, baseStyleName)
-    If Len(base) = 0 And actual = "#000000" Then actual = ""
-    If Len(actual) > 0 Then
-        If actual <> base Then sb = sb & CssPropertyLine("color", actual)
-    End If
-
-    actual = RangeBackgroundColorText(rng)
-    base = StyleBackgroundColorText(doc, baseStyleName)
-    If Len(base) = 0 And actual = "#FFFFFF" Then actual = ""
-    If Len(actual) > 0 Then
-        If actual <> base Then sb = sb & CssPropertyLine("background-color", actual)
-    End If
 
     actual = RangeAlignmentText(rng)
     base = StyleAlignmentText(doc, baseStyleName)
@@ -983,30 +1062,53 @@ Private Function CssPropertiesForStyle(ByVal doc As Document, ByVal styleName As
 
     Dim st As Style
     Set st = doc.Styles(styleName)
+    On Error Resume Next
 
     Dim sb As String
     Dim fontName As String
     fontName = st.Font.Name
+    If Err.Number <> 0 Then
+        Err.Clear
+        fontName = ""
+    End If
     If Len(fontName) > 0 Then sb = sb & "  font-family: " & CssString(fontName) & ";" & vbCrLf
 
     If st.Font.Size > 0 And st.Font.Size < 200 Then sb = sb & "  font-size: " & FormatNumberInvariant(st.Font.Size, 1) & "pt;" & vbCrLf
+    If Err.Number <> 0 Then Err.Clear
     If st.Font.Bold = True Then sb = sb & "  font-weight: 700;" & vbCrLf
+    If Err.Number <> 0 Then Err.Clear
     If st.Font.Italic = True Then sb = sb & "  font-style: italic;" & vbCrLf
+    If Err.Number <> 0 Then Err.Clear
 
     Dim colorValue As String
     colorValue = WordColorToCss(st.Font.Color)
+    If Err.Number <> 0 Then
+        Err.Clear
+        colorValue = ""
+    End If
     If Len(colorValue) > 0 Then sb = sb & "  color: " & colorValue & ";" & vbCrLf
 
     Dim backgroundValue As String
     backgroundValue = StyleBackgroundColorText(doc, styleName)
+    If Err.Number <> 0 Then
+        Err.Clear
+        backgroundValue = ""
+    End If
     If Len(backgroundValue) > 0 Then sb = sb & "  background-color: " & backgroundValue & ";" & vbCrLf
 
     Dim alignValue As String
     alignValue = AlignmentToCss(st.ParagraphFormat.Alignment)
+    If Err.Number <> 0 Then
+        Err.Clear
+        alignValue = ""
+    End If
     If Len(alignValue) > 0 Then sb = sb & "  text-align: " & alignValue & ";" & vbCrLf
 
     If st.ParagraphFormat.SpaceBefore > 0 And st.ParagraphFormat.SpaceBefore < 200 Then sb = sb & "  margin-top: " & FormatNumberInvariant(st.ParagraphFormat.SpaceBefore, 1) & "pt;" & vbCrLf
+    If Err.Number <> 0 Then Err.Clear
     If st.ParagraphFormat.SpaceAfter >= 0 And st.ParagraphFormat.SpaceAfter < 200 Then sb = sb & "  margin-bottom: " & FormatNumberInvariant(st.ParagraphFormat.SpaceAfter, 1) & "pt;" & vbCrLf
+    If Err.Number <> 0 Then Err.Clear
+    On Error GoTo 0
 
     If Len(sb) = 0 Then sb = "  /* no direct style properties exported */" & vbCrLf
     CssPropertiesForStyle = sb
@@ -1071,6 +1173,7 @@ End Function
 Private Function RangeFontColorText(ByVal rng As Range) As String
     On Error GoTo Fail
     RangeFontColorText = WordColorToCss(rng.Font.Color)
+    If Len(RangeFontColorText) = 0 Then RangeFontColorText = FirstCharacterFontColorText(rng)
     Exit Function
 
 Fail:
@@ -1080,10 +1183,49 @@ End Function
 Private Function RangeBackgroundColorText(ByVal rng As Range) As String
     On Error GoTo Fail
     RangeBackgroundColorText = WordColorToCss(rng.Shading.BackgroundPatternColor)
+    If Len(RangeBackgroundColorText) = 0 Then RangeBackgroundColorText = WordHighlightColorToCss(rng.HighlightColorIndex)
+    If Len(RangeBackgroundColorText) = 0 Then RangeBackgroundColorText = FirstCharacterBackgroundColorText(rng)
     Exit Function
 
 Fail:
     RangeBackgroundColorText = ""
+End Function
+
+Private Function FirstCharacterFontColorText(ByVal rng As Range) As String
+    On Error GoTo Fail
+
+    Dim i As Long
+    For i = rng.Start To rng.End - 1
+        Dim cr As Range
+        Set cr = rng.Document.Range(i, i + 1)
+        If Len(NormalizeWordInlineText(cr.Text)) > 0 Then
+            FirstCharacterFontColorText = WordColorToCss(cr.Font.Color)
+            If Len(FirstCharacterFontColorText) > 0 Then Exit Function
+        End If
+    Next i
+    Exit Function
+
+Fail:
+    FirstCharacterFontColorText = ""
+End Function
+
+Private Function FirstCharacterBackgroundColorText(ByVal rng As Range) As String
+    On Error GoTo Fail
+
+    Dim i As Long
+    For i = rng.Start To rng.End - 1
+        Dim cr As Range
+        Set cr = rng.Document.Range(i, i + 1)
+        If Len(NormalizeWordInlineText(cr.Text)) > 0 Then
+            FirstCharacterBackgroundColorText = WordColorToCss(cr.Shading.BackgroundPatternColor)
+            If Len(FirstCharacterBackgroundColorText) = 0 Then FirstCharacterBackgroundColorText = WordHighlightColorToCss(cr.HighlightColorIndex)
+            If Len(FirstCharacterBackgroundColorText) > 0 Then Exit Function
+        End If
+    Next i
+    Exit Function
+
+Fail:
+    FirstCharacterBackgroundColorText = ""
 End Function
 
 Private Function RangeAlignmentText(ByVal rng As Range) As String
@@ -1539,6 +1681,51 @@ Fail:
     WordColorToCss = ""
 End Function
 
+Private Function WordHighlightColorToCss(ByVal highlightValue As Long) As String
+    On Error GoTo Fail
+
+    Select Case highlightValue
+        Case wdNoHighlight
+            WordHighlightColorToCss = ""
+        Case wdYellow
+            WordHighlightColorToCss = "#FFFF00"
+        Case wdBrightGreen
+            WordHighlightColorToCss = "#00FF00"
+        Case wdTurquoise
+            WordHighlightColorToCss = "#00FFFF"
+        Case wdPink
+            WordHighlightColorToCss = "#FF00FF"
+        Case wdBlue
+            WordHighlightColorToCss = "#0000FF"
+        Case wdRed
+            WordHighlightColorToCss = "#FF0000"
+        Case wdDarkBlue
+            WordHighlightColorToCss = "#000080"
+        Case wdTeal
+            WordHighlightColorToCss = "#008080"
+        Case wdGreen
+            WordHighlightColorToCss = "#008000"
+        Case wdViolet
+            WordHighlightColorToCss = "#800080"
+        Case wdDarkRed
+            WordHighlightColorToCss = "#800000"
+        Case wdDarkYellow
+            WordHighlightColorToCss = "#808000"
+        Case wdGray50
+            WordHighlightColorToCss = "#808080"
+        Case wdGray25
+            WordHighlightColorToCss = "#C0C0C0"
+        Case wdBlack
+            WordHighlightColorToCss = "#000000"
+        Case Else
+            WordHighlightColorToCss = ""
+    End Select
+    Exit Function
+
+Fail:
+    WordHighlightColorToCss = ""
+End Function
+
 Private Function AlignmentToCss(ByVal alignmentValue As Long) As String
     Select Case alignmentValue
         Case wdAlignParagraphCenter
@@ -1682,6 +1869,15 @@ End Function
 
 Private Function HtmlCommentSafe(ByVal textValue As String) As String
     HtmlCommentSafe = Replace(textValue, "--", "- -")
+End Function
+
+Private Function HtmlAttributeEscape(ByVal textValue As String) As String
+    Dim s As String
+    s = Replace(textValue, "&", "&amp;")
+    s = Replace(s, """", "&quot;")
+    s = Replace(s, "<", "&lt;")
+    s = Replace(s, ">", "&gt;")
+    HtmlAttributeEscape = s
 End Function
 
 Private Function Slugify(ByVal textValue As String) As String
