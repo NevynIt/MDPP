@@ -49,6 +49,7 @@ Public Sub ExportActiveDocumentToMdppFolder(ByVal exportRoot As String)
     EnsureFolder fso, fso.BuildPath(exportRoot, "styles")
     EnsureFolder fso, fso.BuildPath(exportRoot, "assets")
     EnsureFolder fso, fso.BuildPath(exportRoot, "comments")
+    ClearGeneratedAssetFiles fso, fso.BuildPath(exportRoot, "assets")
 
     Dim usedStyles As Object
     Set usedStyles = CreateObject("Scripting.Dictionary")
@@ -166,6 +167,9 @@ Private Function BuildRootMarkdown(ByVal doc As Document, ByVal imageFiles As Co
         If Not p.Range.Information(wdWithInTable) Then
             Dim paraMd As String
             paraMd = ParagraphToMarkdown(doc, p, usedStyles, diagnostics)
+            If p.Range.InlineShapes.Count > 0 Then
+                If IsImagePlaceholderMarkdown(paraMd) Then paraMd = ""
+            End If
             If Len(paraMd) > 0 Then
                 sb = sb & paraMd & vbCrLf & vbCrLf
             End If
@@ -197,14 +201,15 @@ Private Function ParagraphToMarkdown(ByVal doc As Document, ByVal p As Paragraph
     Dim styleName As String
     styleName = StyleNameOfParagraph(p)
 
-    Dim classAttr As String
-    classAttr = ClassAttributeForStyle(styleName, False)
-
     Dim headingLevel As Long
     headingLevel = HeadingLevelOfParagraph(p)
 
     If headingLevel >= 1 And headingLevel <= 6 Then
-        ParagraphToMarkdown = String$(headingLevel, "#") & " " & txt & InlineAttribute(classAttr)
+        Dim headingClassAttr As String
+        headingClassAttr = ClassAttributeForStyle(styleName, False)
+        If IsGenericHeadingStyle(styleName, headingLevel) Then headingClassAttr = ""
+
+        ParagraphToMarkdown = String$(headingLevel, "#") & " " & txt & InlineAttribute(headingClassAttr)
         Exit Function
     End If
 
@@ -213,7 +218,17 @@ Private Function ParagraphToMarkdown(ByVal doc As Document, ByVal p As Paragraph
         Exit Function
     End If
 
+    Dim classAttr As String
+    classAttr = ClassAttributeForStyle(styleName, False)
+    If IsGenericParagraphStyle(styleName) Then classAttr = ""
+
     ParagraphToMarkdown = txt & InlineAttribute(classAttr)
+End Function
+
+Private Function IsImagePlaceholderMarkdown(ByVal markdownText As String) As Boolean
+    Dim s As String
+    s = Trim$(markdownText)
+    IsImagePlaceholderMarkdown = (s = "/" Or s = "\/")
 End Function
 
 Private Function TableToMarkdown(ByVal doc As Document, ByVal tbl As Table, ByVal usedStyles As Object, ByVal diagnostics As Collection) As String
@@ -458,6 +473,14 @@ Private Function BuildThemeMarkdown(ByVal doc As Document, ByVal usedStyles As O
     sb = sb & "max-width: 100%" & vbCrLf
     sb = sb & "caption-class: word-caption" & vbCrLf & vbCrLf
 
+    sb = sb & "## component paragraph" & vbCrLf
+    sb = sb & ThemePropertiesForStyle(doc, DefaultParagraphStyleName(doc, usedStyles))
+    sb = sb & vbCrLf
+
+    sb = sb & "## component heading-1" & vbCrLf
+    sb = sb & ThemePropertiesForStyle(doc, "Heading 1")
+    sb = sb & vbCrLf
+
     sb = sb & BuildPageFurnitureTheme(doc)
 
     Dim keys As Variant
@@ -470,9 +493,11 @@ Private Function BuildThemeMarkdown(ByVal doc As Document, ByVal usedStyles As O
         Dim cls As String
         cls = StyleClassName(styleName)
         If Len(cls) > 0 Then
-            sb = sb & "## class " & cls & vbCrLf
-            sb = sb & ThemePropertiesForStyle(doc, styleName)
-            sb = sb & vbCrLf
+            If ShouldEmitStyleClass(styleName) Then
+                sb = sb & "## class " & cls & vbCrLf
+                sb = sb & ThemePropertiesForStyle(doc, styleName)
+                sb = sb & vbCrLf
+            End If
         End If
     Next i
 
@@ -568,6 +593,14 @@ Private Function BuildStandardCss(ByVal doc As Document, ByVal usedStyles As Obj
     sb = sb & ".mdpp-list { margin: 0 0 0.75em 1.5em; padding-left: 1.2em; }" & vbCrLf
     sb = sb & ".mdpp-blockquote { border-left: 4px solid var(--md-colors-border, #d0d7de); margin: 1em 0; padding-left: 1em; color: var(--md-colors-muted, #667085); }" & vbCrLf & vbCrLf
 
+    sb = sb & "/* Generic Word styles mapped onto semantic md++ elements. */" & vbCrLf
+    sb = sb & ".mdpp-document p, .mdpp-paragraph {" & vbCrLf
+    sb = sb & CssPropertiesForStyle(doc, DefaultParagraphStyleName(doc, usedStyles))
+    sb = sb & "}" & vbCrLf & vbCrLf
+    sb = sb & ".mdpp-document h1, .mdpp-heading[data-md-level=""1""] {" & vbCrLf
+    sb = sb & CssPropertiesForStyle(doc, "Heading 1")
+    sb = sb & "}" & vbCrLf & vbCrLf
+
     sb = sb & ".mdpp-table {" & vbCrLf
     sb = sb & "  width: 100%;" & vbCrLf
     sb = sb & "  border-collapse: collapse;" & vbCrLf
@@ -603,9 +636,11 @@ Private Function BuildStandardCss(ByVal doc As Document, ByVal usedStyles As Obj
         Dim cls As String
         cls = StyleClassName(styleName)
         If Len(cls) > 0 Then
-            sb = sb & "." & CssIdentifier(cls) & " {" & vbCrLf
-            sb = sb & CssPropertiesForStyle(doc, styleName)
-            sb = sb & "}" & vbCrLf & vbCrLf
+            If ShouldEmitStyleClass(styleName) Then
+                sb = sb & "." & CssIdentifier(cls) & " {" & vbCrLf
+                sb = sb & CssPropertiesForStyle(doc, styleName)
+                sb = sb & "}" & vbCrLf & vbCrLf
+            End If
         End If
     Next i
 
@@ -680,6 +715,51 @@ Private Function ListPrefix(ByVal p As Paragraph) As String
 
 Fail:
     ListPrefix = "- "
+End Function
+
+Private Function IsGenericParagraphStyle(ByVal styleName As String) As Boolean
+    Dim slug As String
+    slug = Slugify(styleName)
+    IsGenericParagraphStyle = (slug = "normal" Or slug = "body-text")
+End Function
+
+Private Function IsGenericHeadingStyle(ByVal styleName As String, ByVal headingLevel As Long) As Boolean
+    If headingLevel < 1 Or headingLevel > 6 Then
+        IsGenericHeadingStyle = False
+    Else
+        IsGenericHeadingStyle = (Slugify(styleName) = "heading-" & CStr(headingLevel))
+    End If
+End Function
+
+Private Function ShouldEmitStyleClass(ByVal styleName As String) As Boolean
+    Dim slug As String
+    slug = Slugify(styleName)
+
+    If slug = "normal" Or slug = "body-text" Then
+        ShouldEmitStyleClass = False
+    Else
+        ShouldEmitStyleClass = True
+        If Left$(slug, 8) = "heading-" Then
+            If Len(slug) = 9 Then
+                If Mid$(slug, 9, 1) >= "1" Then
+                    If Mid$(slug, 9, 1) <= "6" Then ShouldEmitStyleClass = False
+                End If
+            End If
+        End If
+    End If
+End Function
+
+Private Function DefaultParagraphStyleName(ByVal doc As Document, ByVal usedStyles As Object) As String
+    On Error Resume Next
+    If Not usedStyles Is Nothing Then
+        If usedStyles.Exists("Body Text") Then
+            DefaultParagraphStyleName = "Body Text"
+            Exit Function
+        End If
+    End If
+    On Error GoTo 0
+
+    DefaultParagraphStyleName = "Normal"
 End Function
 
 Private Function ClassAttributeForStyle(ByVal styleName As String, ByVal includeNormal As Boolean) As String
@@ -1000,6 +1080,8 @@ Private Sub ExtractImagesViaFilteredHtml(ByVal doc As Document, ByVal exportRoot
     Next fileObj
     arr.Sort
 
+    Set arr = SelectPrimaryImageFiles(fso, arr, doc.InlineShapes.Count, diagnostics, doc.Name)
+
     Dim assetFolder As String
     assetFolder = fso.BuildPath(exportRoot, "assets")
 
@@ -1044,6 +1126,67 @@ Fail:
     On Error GoTo 0
     AddDiagnostic diagnostics, "Image extraction failed.", "ExtractImagesViaFilteredHtml", stage, Nothing, doc.Name, "document", "", errNumber, errDescription
 End Sub
+
+Private Function SelectPrimaryImageFiles(ByVal fso As Object, ByVal imagePaths As Object, ByVal expectedCount As Long, ByVal diagnostics As Collection, ByVal sourceName As String) As Object
+    If expectedCount <= 0 Or imagePaths.Count <= expectedCount Then
+        Set SelectPrimaryImageFiles = imagePaths
+        Exit Function
+    End If
+
+    Dim selectedIndexes As Object
+    Set selectedIndexes = CreateObject("Scripting.Dictionary")
+
+    Dim pick As Long
+    For pick = 1 To expectedCount
+        Dim bestIndex As Long
+        Dim bestSize As Double
+        bestIndex = -1
+        bestSize = -1
+
+        Dim i As Long
+        For i = 0 To imagePaths.Count - 1
+            If Not selectedIndexes.Exists(CStr(i)) Then
+                Dim sizeValue As Double
+                sizeValue = ImageFileSize(fso, CStr(imagePaths(i)))
+                If sizeValue > bestSize Then
+                    bestSize = sizeValue
+                    bestIndex = i
+                End If
+            End If
+        Next i
+
+        If bestIndex >= 0 Then selectedIndexes.Add CStr(bestIndex), True
+    Next pick
+
+    Dim orderedIndexes As Object
+    Set orderedIndexes = CreateObject("System.Collections.ArrayList")
+
+    Dim key As Variant
+    For Each key In selectedIndexes.Keys
+        orderedIndexes.Add CLng(key)
+    Next key
+    orderedIndexes.Sort
+
+    Dim selectedPaths As Object
+    Set selectedPaths = CreateObject("System.Collections.ArrayList")
+
+    For i = 0 To orderedIndexes.Count - 1
+        selectedPaths.Add CStr(imagePaths(CLng(orderedIndexes(i))))
+    Next i
+
+    AddDiagnostic diagnostics, "Word filtered HTML produced " & CStr(imagePaths.Count) & " image files for " & CStr(expectedCount) & " inline image locations; the exporter kept the largest primary candidates in export order and ignored smaller companion artifacts.", "ExtractImagesViaFilteredHtml", "select primary image files", Nothing, sourceName, "document", "", 0, ""
+
+    Set SelectPrimaryImageFiles = selectedPaths
+End Function
+
+Private Function ImageFileSize(ByVal fso As Object, ByVal filePath As String) As Double
+    On Error GoTo Fail
+    ImageFileSize = CDbl(fso.GetFile(filePath).Size)
+    Exit Function
+
+Fail:
+    ImageFileSize = 0
+End Function
 
 Private Function IsImageExtension(ByVal ext As String) As Boolean
     ext = LCase$(ext)
@@ -1344,6 +1487,17 @@ End Function
 Private Sub EnsureFolder(ByVal fso As Object, ByVal folderPath As String)
     If Len(folderPath) = 0 Then Exit Sub
     If Not fso.FolderExists(folderPath) Then fso.CreateFolder folderPath
+End Sub
+
+Private Sub ClearGeneratedAssetFiles(ByVal fso As Object, ByVal folderPath As String)
+    On Error Resume Next
+    If Len(folderPath) = 0 Then Exit Sub
+    If Not fso.FolderExists(folderPath) Then Exit Sub
+
+    Dim fileObj As Object
+    For Each fileObj In fso.GetFolder(folderPath).Files
+        If LCase$(Left$(fileObj.Name, 6)) = "image-" Then fso.DeleteFile fileObj.Path, True
+    Next fileObj
 End Sub
 
 Private Sub WriteUtf8(ByVal filePath As String, ByVal content As String)
