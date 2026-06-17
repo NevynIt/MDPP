@@ -131,7 +131,10 @@ Private Function BuildRootMarkdown(ByVal doc As Document, ByVal imageFiles As Co
     sb = sb & vbCrLf
 
     If doc.Shapes.Count > 0 Then
-        diagnostics.Add "Floating shapes are not placed in source order. Convert important floating shapes to inline pictures before export, or review the assets manually."
+        Dim shp As Shape
+        For Each shp In doc.Shapes
+            AddDiagnostic diagnostics, "Floating shape is not placed in source order. Convert important floating shapes to inline pictures before export, or review the assets manually.", "BuildRootMarkdown", "doc.Shapes traversal", ShapeAnchorRange(shp), doc.Name, "shape", ShapeDiagnosticIndex(shp), 0, ""
+        Next shp
         sb = sb & "<!-- mdpp-import-warning: floating Word shapes are not placed in source order by this exporter. -->" & vbCrLf & vbCrLf
     End If
 
@@ -156,36 +159,36 @@ Private Function BuildRootMarkdown(ByVal doc As Document, ByVal imageFiles As Co
             ' VBA does not short-circuit And, so keep the bounds check separate from table indexing.
             If pendingTable.Range.Start > p.Range.Start Then Exit Do
 
-            sb = sb & TableToMarkdown(doc, pendingTable, usedStyles) & vbCrLf & vbCrLf
+            sb = sb & TableToMarkdown(doc, pendingTable, usedStyles, diagnostics) & vbCrLf & vbCrLf
             nextTable = nextTable + 1
         Loop
 
         If Not p.Range.Information(wdWithInTable) Then
             Dim paraMd As String
-            paraMd = ParagraphToMarkdown(doc, p, usedStyles)
+            paraMd = ParagraphToMarkdown(doc, p, usedStyles, diagnostics)
             If Len(paraMd) > 0 Then
                 sb = sb & paraMd & vbCrLf & vbCrLf
             End If
 
             Dim ils As InlineShape
             For Each ils In p.Range.InlineShapes
-                sb = sb & InlineShapeMarkdown(imageIndex, imageFiles) & vbCrLf & vbCrLf
+                sb = sb & InlineShapeMarkdown(imageIndex, imageFiles, diagnostics, ils.Range, doc.Name) & vbCrLf & vbCrLf
                 imageIndex = imageIndex + 1
             Next ils
         End If
     Next p
 
     Do While nextTable <= tables.Count
-        sb = sb & TableToMarkdown(doc, tables(nextTable), usedStyles) & vbCrLf & vbCrLf
+        sb = sb & TableToMarkdown(doc, tables(nextTable), usedStyles, diagnostics) & vbCrLf & vbCrLf
         nextTable = nextTable + 1
     Loop
 
     BuildRootMarkdown = NormalizeLineEndings(sb)
 End Function
 
-Private Function ParagraphToMarkdown(ByVal doc As Document, ByVal p As Paragraph, ByVal usedStyles As Object) As String
+Private Function ParagraphToMarkdown(ByVal doc As Document, ByVal p As Paragraph, ByVal usedStyles As Object, ByVal diagnostics As Collection) As String
     Dim txt As String
-    txt = Trim$(InlineRangeToMarkdown(doc, p.Range))
+    txt = Trim$(InlineRangeToMarkdown(doc, p.Range, diagnostics, "ParagraphToMarkdown", "paragraph inline conversion"))
     If Len(txt) = 0 Then
         ParagraphToMarkdown = ""
         Exit Function
@@ -213,7 +216,7 @@ Private Function ParagraphToMarkdown(ByVal doc As Document, ByVal p As Paragraph
     ParagraphToMarkdown = txt & InlineAttribute(classAttr)
 End Function
 
-Private Function TableToMarkdown(ByVal doc As Document, ByVal tbl As Table, ByVal usedStyles As Object) As String
+Private Function TableToMarkdown(ByVal doc As Document, ByVal tbl As Table, ByVal usedStyles As Object, ByVal diagnostics As Collection) As String
     On Error GoTo Fail
 
     Dim rowsCount As Long
@@ -231,7 +234,7 @@ Private Function TableToMarkdown(ByVal doc As Document, ByVal tbl As Table, ByVa
 
     sb = ""
     For c = 1 To colsCount
-        sb = sb & "| " & MarkdownTableCell(CellTextMarkdown(doc, tbl, 1, c)) & " "
+        sb = sb & "| " & MarkdownTableCell(CellTextMarkdown(doc, tbl, 1, c, diagnostics)) & " "
     Next c
     sb = sb & "|" & vbCrLf
 
@@ -243,7 +246,7 @@ Private Function TableToMarkdown(ByVal doc As Document, ByVal tbl As Table, ByVa
     If rowsCount >= 2 Then
         For r = 2 To rowsCount
             For c = 1 To colsCount
-                sb = sb & "| " & MarkdownTableCell(CellTextMarkdown(doc, tbl, r, c)) & " "
+                sb = sb & "| " & MarkdownTableCell(CellTextMarkdown(doc, tbl, r, c, diagnostics)) & " "
             Next c
             sb = sb & "|" & vbCrLf
         Next r
@@ -253,34 +256,38 @@ Private Function TableToMarkdown(ByVal doc As Document, ByVal tbl As Table, ByVa
     Exit Function
 
 Fail:
+    AddDiagnostic diagnostics, "Table could not be converted cleanly; a warning placeholder was emitted.", "TableToMarkdown", "table markdown conversion", tbl.Range, doc.Name, "table", TableDiagnosticIndex(tbl), Err.Number, Err.Description
     TableToMarkdown = "<!-- mdpp-import-warning: table could not be converted cleanly. -->"
 End Function
 
-Private Function CellTextMarkdown(ByVal doc As Document, ByVal tbl As Table, ByVal rowIndex As Long, ByVal colIndex As Long) As String
+Private Function CellTextMarkdown(ByVal doc As Document, ByVal tbl As Table, ByVal rowIndex As Long, ByVal colIndex As Long, ByVal diagnostics As Collection) As String
     On Error GoTo Fail
 
     Dim cellRange As Range
     Set cellRange = tbl.Cell(rowIndex, colIndex).Range.Duplicate
     StripRangeEndMarks cellRange
-    CellTextMarkdown = Trim$(InlineRangeToMarkdown(doc, cellRange))
+    CellTextMarkdown = Trim$(InlineRangeToMarkdown(doc, cellRange, diagnostics, "CellTextMarkdown", "table cell r" & CStr(rowIndex) & " c" & CStr(colIndex)))
     Exit Function
 
 Fail:
+    AddDiagnostic diagnostics, "Table cell could not be read; the exported table cell was left empty.", "CellTextMarkdown", "tbl.Cell(" & CStr(rowIndex) & "," & CStr(colIndex) & ")", tbl.Range, doc.Name, "table-cell", TableDiagnosticIndex(tbl) & " r" & CStr(rowIndex) & " c" & CStr(colIndex), Err.Number, Err.Description
     CellTextMarkdown = ""
 End Function
 
-Private Function InlineShapeMarkdown(ByVal imageIndex As Long, ByVal imageFiles As Collection) As String
+Private Function InlineShapeMarkdown(ByVal imageIndex As Long, ByVal imageFiles As Collection, ByVal diagnostics As Collection, ByVal sourceRange As Range, ByVal sourceName As String) As String
     Dim rel As String
     If imageIndex <= imageFiles.Count Then
         rel = "assets/" & CStr(imageFiles(imageIndex))
     Else
-        rel = "assets/image-" & Format$(imageIndex, "000") & ".png"
+        AddDiagnostic diagnostics, "Inline image " & CStr(imageIndex) & " was not extracted; the Markdown output contains a warning placeholder instead of a broken asset reference.", "InlineShapeMarkdown", "image asset lookup", sourceRange, sourceName, "inline-shape", "image " & CStr(imageIndex), 0, ""
+        InlineShapeMarkdown = "<!-- mdpp-import-warning: inline image " & CStr(imageIndex) & " was not extracted. -->"
+        Exit Function
     End If
 
     InlineShapeMarkdown = "![Image " & CStr(imageIndex) & "](" & rel & "){.word-image}"
 End Function
 
-Private Function InlineRangeToMarkdown(ByVal doc As Document, ByVal rng As Range) As String
+Private Function InlineRangeToMarkdown(ByVal doc As Document, ByVal rng As Range, ByVal diagnostics As Collection, ByVal macroProcedure As String, ByVal macroStep As String) As String
     On Error GoTo PlainFallback
 
     Dim rr As Range
@@ -293,7 +300,7 @@ Private Function InlineRangeToMarkdown(ByVal doc As Document, ByVal rng As Range
     End If
 
     If rr.Hyperlinks.Count = 0 Then
-        InlineRangeToMarkdown = FormatCharsMarkdown(doc, rr.Start, rr.End)
+        InlineRangeToMarkdown = FormatCharsMarkdown(doc, rr.Start, rr.End, diagnostics, rr, macroProcedure, macroStep & " characters")
         Exit Function
     End If
 
@@ -304,7 +311,7 @@ Private Function InlineRangeToMarkdown(ByVal doc As Document, ByVal rng As Range
     Dim h As Hyperlink
     For Each h In rr.Hyperlinks
         If h.Range.Start > pos Then
-            sb = sb & FormatCharsMarkdown(doc, pos, h.Range.Start)
+            sb = sb & FormatCharsMarkdown(doc, pos, h.Range.Start, diagnostics, rr, macroProcedure, macroStep & " before hyperlink")
         End If
 
         Dim labelText As String
@@ -331,17 +338,18 @@ Private Function InlineRangeToMarkdown(ByVal doc As Document, ByVal rng As Range
     Next h
 
     If pos < rr.End Then
-        sb = sb & FormatCharsMarkdown(doc, pos, rr.End)
+        sb = sb & FormatCharsMarkdown(doc, pos, rr.End, diagnostics, rr, macroProcedure, macroStep & " after hyperlink")
     End If
 
     InlineRangeToMarkdown = sb
     Exit Function
 
 PlainFallback:
+    AddDiagnostic diagnostics, "Inline range could not be converted with formatting; plain escaped text was emitted.", macroProcedure, macroStep, rng, doc.Name, "range", "", Err.Number, Err.Description
     InlineRangeToMarkdown = MarkdownEscapeInline(CleanRangeText(rng.Text))
 End Function
 
-Private Function FormatCharsMarkdown(ByVal doc As Document, ByVal startPos As Long, ByVal endPos As Long) As String
+Private Function FormatCharsMarkdown(ByVal doc As Document, ByVal startPos As Long, ByVal endPos As Long, ByVal diagnostics As Collection, ByVal sourceRange As Range, ByVal macroProcedure As String, ByVal macroStep As String) As String
     On Error GoTo Fail
 
     Dim sb As String
@@ -356,10 +364,8 @@ Private Function FormatCharsMarkdown(ByVal doc As Document, ByVal startPos As Lo
         Set cr = doc.Range(i, i + 1)
 
         Dim ch As String
-        ch = cr.Text
-        If ch <> Chr$(13) And ch <> Chr$(7) Then
-            If ch = vbTab Then ch = " "
-
+        ch = NormalizeWordInlineText(cr.Text)
+        If Len(ch) > 0 Then
             Dim isBold As Boolean
             Dim isItalic As Boolean
             isBold = (cr.Font.Bold <> 0)
@@ -390,6 +396,7 @@ Private Function FormatCharsMarkdown(ByVal doc As Document, ByVal startPos As Lo
     Exit Function
 
 Fail:
+    AddDiagnostic diagnostics, "Character formatting could not be converted; this text segment was omitted.", macroProcedure, macroStep, sourceRange, doc.Name, "range", "start " & CStr(startPos) & " end " & CStr(endPos), Err.Number, Err.Description
     FormatCharsMarkdown = ""
 End Function
 
@@ -790,11 +797,13 @@ Private Function BuildImportDiagnosticsJson(ByVal doc As Document, ByVal diagnos
     Dim i As Long
     For i = 1 To diagnostics.Count
         If i > 1 Then sb = sb & "," & vbCrLf
-        sb = sb & "    {" & vbCrLf
-        sb = sb & "      ""severity"": ""warning""," & vbCrLf
-        sb = sb & "      ""code"": ""MDPP0421""," & vbCrLf
-        sb = sb & "      ""message"": """ & JsonEscape(CStr(diagnostics(i))) & """" & vbCrLf
-        sb = sb & "    }"
+        If IsObject(diagnostics(i)) Then
+            Dim diagnostic As Object
+            Set diagnostic = diagnostics(i)
+            sb = sb & DiagnosticToJson(diagnostic)
+        Else
+            sb = sb & LegacyDiagnosticToJson(CStr(diagnostics(i)))
+        End If
     Next i
 
     sb = sb & vbCrLf & "  ]" & vbCrLf
@@ -802,37 +811,186 @@ Private Function BuildImportDiagnosticsJson(ByVal doc As Document, ByVal diagnos
     BuildImportDiagnosticsJson = NormalizeLineEndings(sb)
 End Function
 
+Private Sub AddDiagnostic(ByVal diagnostics As Collection, ByVal message As String, ByVal macroProcedure As String, ByVal macroStep As String, ByVal sourceRange As Range, ByVal sourceName As String, ByVal sourceKind As String, ByVal sourceIndex As String, ByVal errorNumber As Long, ByVal errorDescription As String)
+    On Error Resume Next
+
+    Dim d As Object
+    Set d = CreateObject("Scripting.Dictionary")
+
+    d.Add "severity", "warning"
+    d.Add "code", "MDPP0421"
+    d.Add "message", message
+    d.Add "macroProcedure", macroProcedure
+    d.Add "macroStep", macroStep
+    d.Add "sourceName", sourceName
+    d.Add "sourceKind", sourceKind
+    d.Add "sourceIndex", sourceIndex
+    d.Add "sourceStart", ""
+    d.Add "sourceEnd", ""
+    d.Add "sourcePage", ""
+    d.Add "sourceLine", ""
+    d.Add "sourceText", ""
+    d.Add "errorNumber", ""
+    d.Add "errorDescription", errorDescription
+
+    If errorNumber <> 0 Then d("errorNumber") = CStr(errorNumber)
+
+    If Not sourceRange Is Nothing Then
+        If Len(sourceName) = 0 Then d("sourceName") = sourceRange.Document.Name
+        d("sourceStart") = CStr(sourceRange.Start)
+        d("sourceEnd") = CStr(sourceRange.End)
+        d("sourcePage") = CStr(sourceRange.Information(wdActiveEndPageNumber))
+        d("sourceLine") = CStr(sourceRange.Information(wdFirstCharacterLineNumber))
+        d("sourceText") = DiagnosticPreview(CleanRangeText(sourceRange.Text), 180)
+    End If
+
+    diagnostics.Add d
+End Sub
+
+Private Function DiagnosticToJson(ByVal d As Object) As String
+    Dim sb As String
+    sb = "    {" & vbCrLf
+    sb = sb & "      ""severity"": """ & JsonEscape(DiagnosticString(d, "severity", "warning")) & """," & vbCrLf
+    sb = sb & "      ""code"": """ & JsonEscape(DiagnosticString(d, "code", "MDPP0421")) & """," & vbCrLf
+    sb = sb & "      ""message"": """ & JsonEscape(DiagnosticString(d, "message", "")) & """," & vbCrLf
+    sb = sb & "      ""macro"": {" & vbCrLf
+    sb = sb & "        ""procedure"": """ & JsonEscape(DiagnosticString(d, "macroProcedure", "")) & """," & vbCrLf
+    sb = sb & "        ""step"": """ & JsonEscape(DiagnosticString(d, "macroStep", "")) & """" & vbCrLf
+    sb = sb & "      }," & vbCrLf
+    sb = sb & "      ""sourceLocation"": {" & vbCrLf
+    sb = sb & "        ""name"": """ & JsonEscape(DiagnosticString(d, "sourceName", "")) & """," & vbCrLf
+    sb = sb & "        ""kind"": """ & JsonEscape(DiagnosticString(d, "sourceKind", "")) & """," & vbCrLf
+    sb = sb & "        ""index"": """ & JsonEscape(DiagnosticString(d, "sourceIndex", "")) & """," & vbCrLf
+    sb = sb & "        ""start"": " & DiagnosticNumber(d, "sourceStart") & "," & vbCrLf
+    sb = sb & "        ""end"": " & DiagnosticNumber(d, "sourceEnd") & "," & vbCrLf
+    sb = sb & "        ""page"": " & DiagnosticNumber(d, "sourcePage") & "," & vbCrLf
+    sb = sb & "        ""line"": " & DiagnosticNumber(d, "sourceLine") & "," & vbCrLf
+    sb = sb & "        ""text"": """ & JsonEscape(DiagnosticString(d, "sourceText", "")) & """" & vbCrLf
+    sb = sb & "      }," & vbCrLf
+    sb = sb & "      ""vbaError"": {" & vbCrLf
+    sb = sb & "        ""number"": " & DiagnosticNumber(d, "errorNumber") & "," & vbCrLf
+    sb = sb & "        ""description"": """ & JsonEscape(DiagnosticString(d, "errorDescription", "")) & """" & vbCrLf
+    sb = sb & "      }" & vbCrLf
+    sb = sb & "    }"
+    DiagnosticToJson = sb
+End Function
+
+Private Function LegacyDiagnosticToJson(ByVal message As String) As String
+    Dim d As Object
+    Set d = CreateObject("Scripting.Dictionary")
+    d.Add "severity", "warning"
+    d.Add "code", "MDPP0421"
+    d.Add "message", message
+    d.Add "macroProcedure", ""
+    d.Add "macroStep", ""
+    d.Add "sourceName", ""
+    d.Add "sourceKind", ""
+    d.Add "sourceIndex", ""
+    d.Add "sourceStart", ""
+    d.Add "sourceEnd", ""
+    d.Add "sourcePage", ""
+    d.Add "sourceLine", ""
+    d.Add "sourceText", ""
+    d.Add "errorNumber", ""
+    d.Add "errorDescription", ""
+    LegacyDiagnosticToJson = DiagnosticToJson(d)
+End Function
+
+Private Function DiagnosticString(ByVal d As Object, ByVal key As String, ByVal fallback As String) As String
+    On Error GoTo Fail
+    If d.Exists(key) Then
+        DiagnosticString = CStr(d(key))
+    Else
+        DiagnosticString = fallback
+    End If
+    Exit Function
+
+Fail:
+    DiagnosticString = fallback
+End Function
+
+Private Function DiagnosticNumber(ByVal d As Object, ByVal key As String) As String
+    Dim s As String
+    s = Trim$(DiagnosticString(d, key, ""))
+    If Len(s) = 0 Then
+        DiagnosticNumber = "null"
+    Else
+        DiagnosticNumber = s
+    End If
+End Function
+
+Private Function DiagnosticPreview(ByVal textValue As String, ByVal maxLength As Long) As String
+    Dim s As String
+    s = SingleLine(textValue)
+    If maxLength > 0 And Len(s) > maxLength Then s = Left$(s, maxLength - 1) & "..."
+    DiagnosticPreview = s
+End Function
+
+Private Function ShapeAnchorRange(ByVal shp As Shape) As Range
+    On Error GoTo Fail
+    Set ShapeAnchorRange = shp.Anchor
+    Exit Function
+
+Fail:
+    Set ShapeAnchorRange = Nothing
+End Function
+
+Private Function ShapeDiagnosticIndex(ByVal shp As Shape) As String
+    On Error GoTo Fail
+    ShapeDiagnosticIndex = shp.Name
+    Exit Function
+
+Fail:
+    ShapeDiagnosticIndex = ""
+End Function
+
+Private Function TableDiagnosticIndex(ByVal tbl As Table) As String
+    On Error GoTo Fail
+    TableDiagnosticIndex = "start " & CStr(tbl.Range.Start) & " end " & CStr(tbl.Range.End)
+    Exit Function
+
+Fail:
+    TableDiagnosticIndex = ""
+End Function
+
 Private Sub ExtractImagesViaFilteredHtml(ByVal doc As Document, ByVal exportRoot As String, ByVal imageFiles As Collection, ByVal diagnostics As Collection)
     On Error GoTo Fail
+    Dim stage As String
 
+    stage = "count inline shapes"
     If doc.InlineShapes.Count = 0 Then Exit Sub
 
+    stage = "create filesystem object"
     Dim fso As Object
     Set fso = CreateObject("Scripting.FileSystemObject")
 
+    stage = "create temporary export folder"
     Dim tempRoot As String
     tempRoot = fso.BuildPath(Environ$("TEMP"), "mdpp-word-export-" & Format$(Now, "yyyymmdd-hhnnss") & "-" & CStr(Int(Rnd() * 100000)))
     EnsureFolder fso, tempRoot
 
-    Dim tempDocx As String
+    stage = "prepare temporary filtered HTML path"
     Dim tempHtml As String
-    tempDocx = fso.BuildPath(tempRoot, "source.docx")
     tempHtml = fso.BuildPath(tempRoot, "source.html")
 
-    doc.SaveCopyAs tempDocx
-
+    stage = "copy document content to hidden temporary document"
     Dim tmpDoc As Document
-    Set tmpDoc = Documents.Open(FileName:=tempDocx, ReadOnly:=True, AddToRecentFiles:=False, Visible:=False)
+    Set tmpDoc = Documents.Add(Visible:=False)
+    tmpDoc.Range.FormattedText = doc.Range.FormattedText
+
+    stage = "save temporary document as filtered HTML"
     tmpDoc.SaveAs2 FileName:=tempHtml, FileFormat:=wdFormatFilteredHTML, AddToRecentFiles:=False
     tmpDoc.Close SaveChanges:=False
 
+    stage = "locate filtered HTML image folder"
     Dim filesFolder As String
     filesFolder = fso.BuildPath(tempRoot, "source_files")
     If Not fso.FolderExists(filesFolder) Then
-        diagnostics.Add "Word filtered HTML export did not produce an image folder; image references may need manual repair."
+        AddDiagnostic diagnostics, "Word filtered HTML export did not produce an image folder; image references may need manual repair.", "ExtractImagesViaFilteredHtml", stage, Nothing, doc.Name, "document", "", 0, ""
         Exit Sub
     End If
 
+    stage = "collect exported image files"
     Dim arr As Object
     Set arr = CreateObject("System.Collections.ArrayList")
 
@@ -847,6 +1005,7 @@ Private Sub ExtractImagesViaFilteredHtml(ByVal doc As Document, ByVal exportRoot
 
     Dim i As Long
     For i = 0 To arr.Count - 1
+        stage = "copy image asset " & CStr(i + 1)
         Dim src As String
         Dim ext As String
         Dim destName As String
@@ -862,16 +1021,28 @@ Private Sub ExtractImagesViaFilteredHtml(ByVal doc As Document, ByVal exportRoot
     Next i
 
     If imageFiles.Count < doc.InlineShapes.Count Then
-        diagnostics.Add "Fewer image files were extracted than inline shapes found in the document; some image references may need manual repair."
+        AddDiagnostic diagnostics, "Fewer image files were extracted than inline shapes found in the document; later inline images will be emitted as warning placeholders.", "ExtractImagesViaFilteredHtml", "compare extracted image count", Nothing, doc.Name, "document", "", 0, ""
     End If
 
+    stage = "delete temporary export folder"
     On Error Resume Next
     fso.DeleteFolder tempRoot, True
     On Error GoTo 0
     Exit Sub
 
 Fail:
-    diagnostics.Add "Image extraction failed: " & Err.Description
+    Dim errNumber As Long
+    Dim errDescription As String
+    errNumber = Err.Number
+    errDescription = Err.Description
+
+    On Error Resume Next
+    If Not tmpDoc Is Nothing Then tmpDoc.Close SaveChanges:=False
+    If Not fso Is Nothing Then
+        If Len(tempRoot) > 0 And fso.FolderExists(tempRoot) Then fso.DeleteFolder tempRoot, True
+    End If
+    On Error GoTo 0
+    AddDiagnostic diagnostics, "Image extraction failed.", "ExtractImagesViaFilteredHtml", stage, Nothing, doc.Name, "document", "", errNumber, errDescription
 End Sub
 
 Private Function IsImageExtension(ByVal ext As String) As Boolean
@@ -986,11 +1157,7 @@ End Function
 
 Private Function CleanRangeText(ByVal textValue As String) As String
     Dim s As String
-    s = textValue
-    s = Replace(s, Chr$(13), vbLf)
-    s = Replace(s, Chr$(7), "")
-    s = Replace(s, Chr$(11), vbLf)
-    s = Replace(s, vbTab, " ")
+    s = NormalizeWordInlineText(textValue)
     s = Trim$(s)
     CleanRangeText = s
 End Function
@@ -1011,13 +1178,34 @@ Private Sub StripRangeEndMarks(ByVal rng As Range)
     Do While rng.End > rng.Start
         Dim lastChar As String
         lastChar = rng.Document.Range(rng.End - 1, rng.End).Text
-        If lastChar = Chr$(13) Or lastChar = Chr$(7) Or lastChar = Chr$(11) Then
+        If IsWordRangeEndMark(lastChar) Then
             rng.End = rng.End - 1
         Else
             Exit Do
         End If
     Loop
 End Sub
+
+Private Function IsWordRangeEndMark(ByVal textValue As String) As Boolean
+    Select Case textValue
+        Case Chr$(13), Chr$(7), Chr$(11), Chr$(12), Chr$(13) & Chr$(7)
+            IsWordRangeEndMark = True
+        Case Else
+            IsWordRangeEndMark = False
+    End Select
+End Function
+
+Private Function NormalizeWordInlineText(ByVal textValue As String) As String
+    Dim s As String
+    s = textValue
+    s = Replace(s, Chr$(13) & Chr$(7), "")
+    s = Replace(s, Chr$(7), "")
+    s = Replace(s, Chr$(12), "")
+    s = Replace(s, Chr$(11), vbLf)
+    s = Replace(s, Chr$(13), vbLf)
+    s = Replace(s, vbTab, " ")
+    NormalizeWordInlineText = s
+End Function
 
 Private Function MarkdownEscapeInline(ByVal textValue As String) As String
     Dim s As String
@@ -1033,7 +1221,7 @@ End Function
 
 Private Function MarkdownTableCell(ByVal textValue As String) As String
     Dim s As String
-    s = textValue
+    s = NormalizeWordInlineText(textValue)
     s = Replace(s, vbCrLf, "<br>")
     s = Replace(s, vbCr, "<br>")
     s = Replace(s, vbLf, "<br>")
