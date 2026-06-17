@@ -542,6 +542,12 @@ End Function
 Private Function FormatCharsMarkdown(ByVal doc As Document, ByVal startPos As Long, ByVal endPos As Long, ByVal baseStyleName As String, ByVal wholeCharacterKey As String, ByVal diagnostics As Collection, ByVal sourceRange As Range, ByVal macroProcedure As String, ByVal macroStep As String) As String
     On Error GoTo Fail
 
+    Dim scanCharacterFormatting As Boolean
+    scanCharacterFormatting = (Len(wholeCharacterKey) = 0 And RangeMayHaveInlineCharacterFormatting(doc, sourceRange, baseStyleName))
+    If scanCharacterFormatting And (endPos - startPos) > 500 Then
+        ExportStatus "Scanning inline character formatting in range " & CStr(startPos) & "-" & CStr(endPos)
+    End If
+
     Dim sb As String
     Dim seg As String
     Dim currentBold As Boolean
@@ -567,7 +573,7 @@ Private Function FormatCharsMarkdown(ByVal doc As Document, ByVal startPos As Lo
             Dim characterKey As String
             isBold = (cr.Font.Bold <> 0)
             isItalic = (cr.Font.Italic <> 0)
-            If Len(wholeCharacterKey) = 0 Then
+            If scanCharacterFormatting Then
                 characterKey = CharacterFormattingKey(doc, cr, baseStyleName)
             Else
                 characterKey = ""
@@ -692,6 +698,7 @@ Private Function BuildThemeMarkdown(ByVal doc As Document, ByVal usedStyles As O
     Dim i As Long
     Dim styleYieldCounter As Long
     For i = LBound(keys) To UBound(keys)
+        ExportProgress "Writing theme style classes", i - LBound(keys) + 1, UBound(keys) - LBound(keys) + 1, 25
         YieldToWordUiEvery styleYieldCounter, 50
         Dim styleName As String
         styleName = CStr(keys(i))
@@ -854,6 +861,7 @@ Private Function BuildStandardCss(ByVal doc As Document, ByVal usedStyles As Obj
     Dim i As Long
     Dim styleYieldCounter As Long
     For i = LBound(keys) To UBound(keys)
+        ExportProgress "Writing CSS style classes", i - LBound(keys) + 1, UBound(keys) - LBound(keys) + 1, 25
         YieldToWordUiEvery styleYieldCounter, 50
         Dim styleName As String
         styleName = CStr(keys(i))
@@ -877,8 +885,13 @@ Private Sub CollectUsedParagraphStyles(ByVal doc As Document, ByVal usedStyles A
     On Error Resume Next
 
     Dim p As Paragraph
+    Dim paragraphIndex As Long
+    Dim paragraphCount As Long
     Dim paragraphYieldCounter As Long
+    paragraphCount = doc.StoryRanges(wdMainTextStory).Paragraphs.Count
     For Each p In doc.StoryRanges(wdMainTextStory).Paragraphs
+        paragraphIndex = paragraphIndex + 1
+        ExportProgress "Collecting paragraph styles", paragraphIndex, paragraphCount, 50
         YieldToWordUiEvery paragraphYieldCounter, 20
         If Not p.Range.Information(wdWithInTable) Then
             Dim styleName As String
@@ -1029,42 +1042,48 @@ Private Function WholeRangeCharacterKey(ByVal doc As Document, ByVal rng As Rang
     Set rr = rng.Duplicate
     StripRangeEndMarks rr
 
-    Dim firstKey As String
-    Dim haveText As Boolean
-    Dim yieldCounter As Long
+    If Len(CleanRangeText(rr.Text)) = 0 Then Exit Function
 
-    Dim i As Long
-    For i = rr.Start To rr.End - 1
-        YieldToWordUiEvery yieldCounter, 200
+    Dim characterStyleName As String
+    characterStyleName = CharacterStyleNameOfRange(rr)
+    If Len(characterStyleName) > 0 Then
+        WholeRangeCharacterKey = "style:" & characterStyleName
+        Exit Function
+    End If
 
-        Dim cr As Range
-        Set cr = doc.Range(i, i + 1)
-
-        Dim ch As String
-        ch = NormalizeWordInlineText(cr.Text)
-        If Len(Trim$(ch)) > 0 Then
-            Dim characterKey As String
-            characterKey = CharacterFormattingKey(doc, cr, baseStyleName)
-            If Len(characterKey) = 0 Then
-                WholeRangeCharacterKey = ""
-                Exit Function
-            End If
-
-            If Not haveText Then
-                haveText = True
-                firstKey = characterKey
-            ElseIf characterKey <> firstKey Then
-                WholeRangeCharacterKey = ""
-                Exit Function
-            End If
-        End If
-    Next i
-
-    If haveText Then WholeRangeCharacterKey = firstKey
+    Dim props As String
+    props = CharacterFormattingOverridePropertiesStrict(doc, rr, baseStyleName)
+    If Len(props) > 0 Then WholeRangeCharacterKey = "props:" & props
     Exit Function
 
 Fail:
     WholeRangeCharacterKey = ""
+End Function
+
+Private Function RangeMayHaveInlineCharacterFormatting(ByVal doc As Document, ByVal rng As Range, ByVal baseStyleName As String) As Boolean
+    On Error GoTo Fail
+
+    If Len(CharacterStyleNameOfRange(rng)) > 0 Then
+        RangeMayHaveInlineCharacterFormatting = True
+        Exit Function
+    End If
+
+    If Len(CharacterFormattingOverridePropertiesStrict(doc, rng, baseStyleName)) > 0 Then
+        RangeMayHaveInlineCharacterFormatting = True
+        Exit Function
+    End If
+
+    On Error Resume Next
+    If rng.Font.Color = wdUndefined Then RangeMayHaveInlineCharacterFormatting = True
+    If Len(CStr(rng.Font.Name)) = 0 Then RangeMayHaveInlineCharacterFormatting = True
+    If rng.Font.Size = wdUndefined Then RangeMayHaveInlineCharacterFormatting = True
+    If rng.Shading.BackgroundPatternColor = wdUndefined Then RangeMayHaveInlineCharacterFormatting = True
+    If rng.HighlightColorIndex = wdUndefined Then RangeMayHaveInlineCharacterFormatting = True
+    On Error GoTo 0
+    Exit Function
+
+Fail:
+    RangeMayHaveInlineCharacterFormatting = False
 End Function
 
 Private Function CharacterFormattingKey(ByVal doc As Document, ByVal rng As Range, ByVal baseStyleName As String) As String
@@ -1141,6 +1160,40 @@ Private Function IsMeaningfulCharacterStyle(ByVal styleName As String) As Boolea
     Dim slug As String
     slug = Slugify(styleName)
     IsMeaningfulCharacterStyle = (Len(slug) > 0 And slug <> "default-paragraph-font" And slug <> "paragraph-font")
+End Function
+
+Private Function CharacterFormattingOverridePropertiesStrict(ByVal doc As Document, ByVal rng As Range, ByVal baseStyleName As String) As String
+    Dim sb As String
+    Dim actual As String
+    Dim base As String
+
+    actual = RangeFontName(rng)
+    base = StyleFontName(doc, baseStyleName, "")
+    If Len(actual) > 0 Then
+        If actual <> base Then sb = sb & CssPropertyLine("font-family", CssString(actual))
+    End If
+
+    actual = RangeFontSizeText(rng)
+    base = StyleFontSizeText(doc, baseStyleName)
+    If Len(actual) > 0 Then
+        If actual <> base Then sb = sb & CssPropertyLine("font-size", actual & "pt")
+    End If
+
+    actual = RangeFontColorTextNoFallback(rng)
+    base = StyleFontColorText(doc, baseStyleName)
+    If Len(base) = 0 And actual = "#000000" Then actual = ""
+    If Len(actual) > 0 Then
+        If actual <> base Then sb = sb & CssPropertyLine("color", actual)
+    End If
+
+    actual = RangeBackgroundColorTextNoFallback(rng)
+    base = StyleBackgroundColorText(doc, baseStyleName)
+    If Len(base) = 0 And actual = "#FFFFFF" Then actual = ""
+    If Len(actual) > 0 Then
+        If actual <> base Then sb = sb & CssPropertyLine("background-color", actual)
+    End If
+
+    CharacterFormattingOverridePropertiesStrict = sb
 End Function
 
 Private Function CharacterFormattingOverrideProperties(ByVal doc As Document, ByVal rng As Range, ByVal baseStyleName As String) As String
@@ -1399,6 +1452,15 @@ Fail:
     RangeFontColorText = ""
 End Function
 
+Private Function RangeFontColorTextNoFallback(ByVal rng As Range) As String
+    On Error GoTo Fail
+    RangeFontColorTextNoFallback = WordColorToCss(rng.Font.Color)
+    Exit Function
+
+Fail:
+    RangeFontColorTextNoFallback = ""
+End Function
+
 Private Function RangeBackgroundColorText(ByVal rng As Range) As String
     On Error GoTo Fail
     RangeBackgroundColorText = WordColorToCss(rng.Shading.BackgroundPatternColor)
@@ -1408,6 +1470,16 @@ Private Function RangeBackgroundColorText(ByVal rng As Range) As String
 
 Fail:
     RangeBackgroundColorText = ""
+End Function
+
+Private Function RangeBackgroundColorTextNoFallback(ByVal rng As Range) As String
+    On Error GoTo Fail
+    RangeBackgroundColorTextNoFallback = WordColorToCss(rng.Shading.BackgroundPatternColor)
+    If Len(RangeBackgroundColorTextNoFallback) = 0 Then RangeBackgroundColorTextNoFallback = WordHighlightColorToCss(rng.HighlightColorIndex)
+    Exit Function
+
+Fail:
+    RangeBackgroundColorTextNoFallback = ""
 End Function
 
 Private Function FirstCharacterFontColorText(ByVal rng As Range) As String
@@ -1531,6 +1603,7 @@ Private Function BuildCommentsSidecarJson(ByVal doc As Document) As String
     Dim i As Long
     Dim commentYieldCounter As Long
     For i = 1 To doc.Comments.Count
+        ExportProgress "Serializing comments", i, doc.Comments.Count, 25
         YieldToWordUiEvery commentYieldCounter, 20
         Dim c As Comment
         Set c = doc.Comments(i)
@@ -1725,6 +1798,7 @@ Private Sub ExtractImagesViaFilteredHtml(ByVal doc As Document, ByVal exportRoot
 
     stage = "count inline shapes"
     If doc.InlineShapes.Count = 0 Then Exit Sub
+    ExportStatus "Extracting images for " & CStr(doc.InlineShapes.Count) & " inline shapes"
 
     stage = "create filesystem object"
     Dim fso As Object
@@ -1745,6 +1819,7 @@ Private Sub ExtractImagesViaFilteredHtml(ByVal doc As Document, ByVal exportRoot
     tmpDoc.Range.FormattedText = doc.Range.FormattedText
 
     stage = "save temporary document as filtered HTML"
+    ExportStatus "Saving temporary filtered HTML for image extraction"
     tmpDoc.SaveAs2 FileName:=tempHtml, FileFormat:=wdFormatFilteredHTML, AddToRecentFiles:=False
     tmpDoc.Close SaveChanges:=False
 
@@ -1766,6 +1841,7 @@ Private Sub ExtractImagesViaFilteredHtml(ByVal doc As Document, ByVal exportRoot
         If IsImageExtension(fso.GetExtensionName(fileObj.Name)) Then arr.Add fileObj.Path
     Next fileObj
     arr.Sort
+    ExportStatus "Found " & CStr(arr.Count) & " extracted image files"
 
     Dim assetFolder As String
     assetFolder = fso.BuildPath(exportRoot, "assets")
@@ -1773,6 +1849,7 @@ Private Sub ExtractImagesViaFilteredHtml(ByVal doc As Document, ByVal exportRoot
     Dim i As Long
     Dim imageYieldCounter As Long
     For i = 0 To arr.Count - 1
+        ExportProgress "Copying image assets", i + 1, arr.Count, 5
         YieldToWordUiEvery imageYieldCounter, 5
         stage = "copy image asset " & CStr(i + 1)
         Dim src As String
