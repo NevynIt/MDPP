@@ -63,26 +63,34 @@ Public Sub ExportActiveDocumentToMdppFolder(ByVal exportRoot As String)
     Dim imageFiles As Collection
     Set imageFiles = New Collection
     ExtractImagesViaFilteredHtml doc, exportRoot, imageFiles, diagnostics
+    YieldToWordUi
 
     CollectUsedParagraphStyles doc, usedStyles
+    YieldToWordUi
 
     Dim rootMd As String
     rootMd = BuildRootMarkdown(doc, imageFiles, usedStyles, generatedStyles, diagnostics)
+    YieldToWordUi
 
     Dim themeMd As String
     themeMd = BuildThemeMarkdown(doc, usedStyles, generatedStyles)
+    YieldToWordUi
 
     Dim layoutMd As String
     layoutMd = BuildLayoutMarkdown(doc)
+    YieldToWordUi
 
     Dim css As String
     css = BuildStandardCss(doc, usedStyles, generatedStyles)
+    YieldToWordUi
 
     Dim commentsJson As String
     commentsJson = BuildCommentsSidecarJson(doc)
+    YieldToWordUi
 
     Dim diagnosticsJson As String
     diagnosticsJson = BuildImportDiagnosticsJson(doc, diagnostics)
+    YieldToWordUi
 
     WriteUtf8 fso.BuildPath(exportRoot, "root.md"), rootMd
     WriteUtf8 fso.BuildPath(fso.BuildPath(exportRoot, "themes"), "word-import.theme.md"), themeMd
@@ -117,6 +125,17 @@ Fail:
     PickExportFolder = InputBox("Enter export folder path:", "md++ export")
 End Function
 
+Private Sub YieldToWordUi()
+    On Error Resume Next
+    DoEvents
+End Sub
+
+Private Sub YieldToWordUiEvery(ByRef counter As Long, ByVal interval As Long)
+    counter = counter + 1
+    If interval <= 0 Then interval = 50
+    If counter Mod interval = 0 Then YieldToWordUi
+End Sub
+
 Private Function BuildRootMarkdown(ByVal doc As Document, ByVal imageFiles As Collection, ByVal usedStyles As Object, ByVal generatedStyles As Object, ByVal diagnostics As Collection) As String
     Dim title As String
     title = DocumentTitle(doc)
@@ -137,6 +156,7 @@ Private Function BuildRootMarkdown(ByVal doc As Document, ByVal imageFiles As Co
     If doc.Shapes.Count > 0 Then
         Dim shp As Shape
         For Each shp In doc.Shapes
+            YieldToWordUi
             AddDiagnostic diagnostics, "Floating shape is not placed in source order. Convert important floating shapes to inline pictures before export, or review the assets manually.", "BuildRootMarkdown", "doc.Shapes traversal", ShapeAnchorRange(shp), doc.Name, "shape", ShapeDiagnosticIndex(shp), 0, ""
         Next shp
         sb = sb & "<!-- mdpp-import-warning: floating Word shapes are not placed in source order by this exporter. -->" & vbCrLf & vbCrLf
@@ -167,7 +187,10 @@ Private Function BuildRootMarkdown(ByVal doc As Document, ByVal imageFiles As Co
     inlineShapeOrdinal = 0
 
     Dim p As Paragraph
+    Dim paragraphYieldCounter As Long
     For Each p In mainRange.Paragraphs
+        YieldToWordUiEvery paragraphYieldCounter, 10
+
         Do While nextTable <= tables.Count
             Dim pendingTable As Table
             Set pendingTable = tables(nextTable)
@@ -175,7 +198,7 @@ Private Function BuildRootMarkdown(ByVal doc As Document, ByVal imageFiles As Co
             ' VBA does not short-circuit And, so keep the bounds check separate from table indexing.
             If pendingTable.Range.Start > p.Range.Start Then Exit Do
 
-            sb = sb & TableToMarkdown(doc, pendingTable, usedStyles, generatedStyles, diagnostics) & vbCrLf & vbCrLf
+            sb = sb & TableToMarkdown(doc, pendingTable, diagnostics) & vbCrLf & vbCrLf
             nextTable = nextTable + 1
         Loop
 
@@ -191,6 +214,7 @@ Private Function BuildRootMarkdown(ByVal doc As Document, ByVal imageFiles As Co
 
             Dim ils As InlineShape
             For Each ils In p.Range.InlineShapes
+                YieldToWordUi
                 inlineShapeOrdinal = inlineShapeOrdinal + 1
 
                 Dim imagesForAnchor As Long
@@ -211,7 +235,8 @@ Private Function BuildRootMarkdown(ByVal doc As Document, ByVal imageFiles As Co
     Next p
 
     Do While nextTable <= tables.Count
-        sb = sb & TableToMarkdown(doc, tables(nextTable), usedStyles, generatedStyles, diagnostics) & vbCrLf & vbCrLf
+        YieldToWordUi
+        sb = sb & TableToMarkdown(doc, tables(nextTable), diagnostics) & vbCrLf & vbCrLf
         nextTable = nextTable + 1
     Loop
 
@@ -222,8 +247,14 @@ Private Function ParagraphToMarkdown(ByVal doc As Document, ByVal p As Paragraph
     Dim styleName As String
     styleName = StyleNameOfParagraph(p)
 
+    Dim wholeCharacterKey As String
+    wholeCharacterKey = WholeRangeCharacterKey(doc, p.Range, styleName)
+
+    Dim wholeCharacterClassAttr As String
+    wholeCharacterClassAttr = ClassAttributeForCharacterKey(wholeCharacterKey, usedStyles, generatedStyles, True)
+
     Dim txt As String
-    txt = Trim$(InlineRangeToMarkdown(doc, p.Range, usedStyles, generatedStyles, styleName, diagnostics, "ParagraphToMarkdown", "paragraph inline conversion"))
+    txt = Trim$(InlineRangeToMarkdown(doc, p.Range, styleName, wholeCharacterKey, diagnostics, "ParagraphToMarkdown", "paragraph inline conversion"))
     If Len(txt) = 0 Then
         ParagraphToMarkdown = ""
         Exit Function
@@ -241,13 +272,14 @@ Private Function ParagraphToMarkdown(ByVal doc As Document, ByVal p As Paragraph
         If IsGenericHeadingStyle(styleName, headingLevel) Then headingClassAttr = ""
 
         If Len(headingClassAttr) = 0 Then headingClassAttr = AppendClassAttribute(headingClassAttr, FormattingClassForParagraph(doc, p, styleName, generatedStyles))
+        headingClassAttr = AppendClassAttribute(headingClassAttr, wholeCharacterClassAttr)
 
         ParagraphToMarkdown = String$(headingLevel, "#") & " " & txt & InlineAttribute(headingClassAttr)
         Exit Function
     End If
 
     If IsListParagraph(p) Then
-        ParagraphToMarkdown = ListPrefix(p) & txt
+        ParagraphToMarkdown = ListPrefix(p) & txt & InlineAttribute(wholeCharacterClassAttr)
         Exit Function
     End If
 
@@ -257,6 +289,7 @@ Private Function ParagraphToMarkdown(ByVal doc As Document, ByVal p As Paragraph
     Else
         classAttr = ClassAttributeForStyle(styleName)
     End If
+    classAttr = AppendClassAttribute(classAttr, wholeCharacterClassAttr)
 
     ParagraphToMarkdown = txt & InlineAttribute(classAttr)
 End Function
@@ -264,10 +297,15 @@ End Function
 Private Function IsImagePlaceholderMarkdown(ByVal markdownText As String) As Boolean
     Dim s As String
     s = Trim$(markdownText)
+
+    Dim attrPos As Long
+    attrPos = InStrRev(s, " {")
+    If attrPos > 0 And Right$(s, 1) = "}" Then s = Trim$(Left$(s, attrPos - 1))
+
     IsImagePlaceholderMarkdown = (s = "/" Or s = "\/")
 End Function
 
-Private Function TableToMarkdown(ByVal doc As Document, ByVal tbl As Table, ByVal usedStyles As Object, ByVal generatedStyles As Object, ByVal diagnostics As Collection) As String
+Private Function TableToMarkdown(ByVal doc As Document, ByVal tbl As Table, ByVal diagnostics As Collection) As String
     On Error GoTo Fail
 
     Dim rowsCount As Long
@@ -282,10 +320,12 @@ Private Function TableToMarkdown(ByVal doc As Document, ByVal tbl As Table, ByVa
 
     Dim sb As String
     Dim r As Long, c As Long
+    Dim cellYieldCounter As Long
 
     sb = ""
     For c = 1 To colsCount
-        sb = sb & "| " & MarkdownTableCell(CellTextMarkdown(doc, tbl, 1, c, usedStyles, generatedStyles, diagnostics)) & " "
+        YieldToWordUiEvery cellYieldCounter, 10
+        sb = sb & "| " & MarkdownTableCell(CellTextMarkdown(doc, tbl, 1, c, diagnostics)) & " "
     Next c
     sb = sb & "|" & vbCrLf
 
@@ -296,8 +336,10 @@ Private Function TableToMarkdown(ByVal doc As Document, ByVal tbl As Table, ByVa
 
     If rowsCount >= 2 Then
         For r = 2 To rowsCount
+            YieldToWordUiEvery cellYieldCounter, 10
             For c = 1 To colsCount
-                sb = sb & "| " & MarkdownTableCell(CellTextMarkdown(doc, tbl, r, c, usedStyles, generatedStyles, diagnostics)) & " "
+                YieldToWordUiEvery cellYieldCounter, 10
+                sb = sb & "| " & MarkdownTableCell(CellTextMarkdown(doc, tbl, r, c, diagnostics)) & " "
             Next c
             sb = sb & "|" & vbCrLf
         Next r
@@ -311,13 +353,13 @@ Fail:
     TableToMarkdown = "<!-- mdpp-import-warning: table could not be converted cleanly. -->"
 End Function
 
-Private Function CellTextMarkdown(ByVal doc As Document, ByVal tbl As Table, ByVal rowIndex As Long, ByVal colIndex As Long, ByVal usedStyles As Object, ByVal generatedStyles As Object, ByVal diagnostics As Collection) As String
+Private Function CellTextMarkdown(ByVal doc As Document, ByVal tbl As Table, ByVal rowIndex As Long, ByVal colIndex As Long, ByVal diagnostics As Collection) As String
     On Error GoTo Fail
 
     Dim cellRange As Range
     Set cellRange = tbl.Cell(rowIndex, colIndex).Range.Duplicate
     StripRangeEndMarks cellRange
-    CellTextMarkdown = Trim$(InlineRangeToMarkdown(doc, cellRange, usedStyles, generatedStyles, "Normal", diagnostics, "CellTextMarkdown", "table cell r" & CStr(rowIndex) & " c" & CStr(colIndex)))
+    CellTextMarkdown = Trim$(InlineRangeToMarkdown(doc, cellRange, "Normal", "", diagnostics, "CellTextMarkdown", "table cell r" & CStr(rowIndex) & " c" & CStr(colIndex)))
     Exit Function
 
 Fail:
@@ -361,7 +403,7 @@ Private Function ImagesToEmitForAnchor(ByVal nextImageIndex As Long, ByVal image
     End If
 End Function
 
-Private Function InlineRangeToMarkdown(ByVal doc As Document, ByVal rng As Range, ByVal usedStyles As Object, ByVal generatedStyles As Object, ByVal baseStyleName As String, ByVal diagnostics As Collection, ByVal macroProcedure As String, ByVal macroStep As String) As String
+Private Function InlineRangeToMarkdown(ByVal doc As Document, ByVal rng As Range, ByVal baseStyleName As String, ByVal wholeCharacterKey As String, ByVal diagnostics As Collection, ByVal macroProcedure As String, ByVal macroStep As String) As String
     On Error GoTo PlainFallback
 
     Dim rr As Range
@@ -374,7 +416,7 @@ Private Function InlineRangeToMarkdown(ByVal doc As Document, ByVal rng As Range
     End If
 
     If rr.Hyperlinks.Count = 0 Then
-        InlineRangeToMarkdown = FormatCharsMarkdown(doc, rr.Start, rr.End, usedStyles, generatedStyles, baseStyleName, diagnostics, rr, macroProcedure, macroStep & " characters")
+        InlineRangeToMarkdown = FormatCharsMarkdown(doc, rr.Start, rr.End, baseStyleName, wholeCharacterKey, diagnostics, rr, macroProcedure, macroStep & " characters")
         Exit Function
     End If
 
@@ -385,7 +427,7 @@ Private Function InlineRangeToMarkdown(ByVal doc As Document, ByVal rng As Range
     Dim h As Hyperlink
     For Each h In rr.Hyperlinks
         If h.Range.Start > pos Then
-            sb = sb & FormatCharsMarkdown(doc, pos, h.Range.Start, usedStyles, generatedStyles, baseStyleName, diagnostics, rr, macroProcedure, macroStep & " before hyperlink")
+            sb = sb & FormatCharsMarkdown(doc, pos, h.Range.Start, baseStyleName, wholeCharacterKey, diagnostics, rr, macroProcedure, macroStep & " before hyperlink")
         End If
 
         Dim labelText As String
@@ -412,7 +454,7 @@ Private Function InlineRangeToMarkdown(ByVal doc As Document, ByVal rng As Range
     Next h
 
     If pos < rr.End Then
-        sb = sb & FormatCharsMarkdown(doc, pos, rr.End, usedStyles, generatedStyles, baseStyleName, diagnostics, rr, macroProcedure, macroStep & " after hyperlink")
+        sb = sb & FormatCharsMarkdown(doc, pos, rr.End, baseStyleName, wholeCharacterKey, diagnostics, rr, macroProcedure, macroStep & " after hyperlink")
     End If
 
     InlineRangeToMarkdown = sb
@@ -423,18 +465,23 @@ PlainFallback:
     InlineRangeToMarkdown = MarkdownEscapeInline(CleanRangeText(rng.Text))
 End Function
 
-Private Function FormatCharsMarkdown(ByVal doc As Document, ByVal startPos As Long, ByVal endPos As Long, ByVal usedStyles As Object, ByVal generatedStyles As Object, ByVal baseStyleName As String, ByVal diagnostics As Collection, ByVal sourceRange As Range, ByVal macroProcedure As String, ByVal macroStep As String) As String
+Private Function FormatCharsMarkdown(ByVal doc As Document, ByVal startPos As Long, ByVal endPos As Long, ByVal baseStyleName As String, ByVal wholeCharacterKey As String, ByVal diagnostics As Collection, ByVal sourceRange As Range, ByVal macroProcedure As String, ByVal macroStep As String) As String
     On Error GoTo Fail
 
     Dim sb As String
     Dim seg As String
     Dim currentBold As Boolean
     Dim currentItalic As Boolean
-    Dim currentClass As String
+    Dim currentCharacterKey As String
+    Dim characterRunStart As Long
+    Dim styleInitialized As Boolean
     Dim initialized As Boolean
+    Dim yieldCounter As Long
 
     Dim i As Long
     For i = startPos To endPos - 1
+        YieldToWordUiEvery yieldCounter, 200
+
         Dim cr As Range
         Set cr = doc.Range(i, i + 1)
 
@@ -443,32 +490,48 @@ Private Function FormatCharsMarkdown(ByVal doc As Document, ByVal startPos As Lo
         If Len(ch) > 0 Then
             Dim isBold As Boolean
             Dim isItalic As Boolean
-            Dim charClass As String
+            Dim characterKey As String
             isBold = (cr.Font.Bold <> 0)
             isItalic = (cr.Font.Italic <> 0)
-            charClass = CharacterClassForRange(doc, cr, baseStyleName, usedStyles, generatedStyles)
+            If Len(wholeCharacterKey) = 0 Then
+                characterKey = CharacterFormattingKey(doc, cr, baseStyleName)
+            Else
+                characterKey = ""
+            End If
 
             If Not initialized Then
                 initialized = True
                 currentBold = isBold
                 currentItalic = isItalic
-                currentClass = charClass
             End If
 
-            If isBold <> currentBold Or isItalic <> currentItalic Or charClass <> currentClass Then
-                sb = sb & StyledInlineSegment(seg, currentBold, currentItalic, currentClass)
+            If Not styleInitialized Then
+                styleInitialized = True
+                currentCharacterKey = characterKey
+                characterRunStart = i
+            ElseIf characterKey <> currentCharacterKey Then
+                AddUnsupportedInlineStyleDiagnostic doc, diagnostics, macroProcedure, macroStep, currentCharacterKey, characterRunStart, i
+                currentCharacterKey = characterKey
+                characterRunStart = i
+            End If
+
+            If isBold <> currentBold Or isItalic <> currentItalic Then
+                sb = sb & StyledInlineSegment(seg, currentBold, currentItalic)
                 seg = ""
                 currentBold = isBold
                 currentItalic = isItalic
-                currentClass = charClass
             End If
 
             seg = seg & ch
         End If
     Next i
 
+    If styleInitialized Then
+        AddUnsupportedInlineStyleDiagnostic doc, diagnostics, macroProcedure, macroStep, currentCharacterKey, characterRunStart, endPos
+    End If
+
     If Len(seg) > 0 Then
-        sb = sb & StyledInlineSegment(seg, currentBold, currentItalic, currentClass)
+        sb = sb & StyledInlineSegment(seg, currentBold, currentItalic)
     End If
 
     FormatCharsMarkdown = sb
@@ -479,27 +542,20 @@ Fail:
     FormatCharsMarkdown = ""
 End Function
 
-Private Function StyledInlineSegment(ByVal textValue As String, ByVal isBold As Boolean, ByVal isItalic As Boolean, ByVal className As String) As String
+Private Function StyledInlineSegment(ByVal textValue As String, ByVal isBold As Boolean, ByVal isItalic As Boolean) As String
     Dim escaped As String
     escaped = MarkdownEscapeInline(textValue)
-    Dim rendered As String
 
     If Len(Trim$(escaped)) = 0 Then
-        rendered = escaped
+        StyledInlineSegment = escaped
     ElseIf isBold And isItalic Then
-        rendered = "***" & escaped & "***"
+        StyledInlineSegment = "***" & escaped & "***"
     ElseIf isBold Then
-        rendered = "**" & escaped & "**"
+        StyledInlineSegment = "**" & escaped & "**"
     ElseIf isItalic Then
-        rendered = "*" & escaped & "*"
+        StyledInlineSegment = "*" & escaped & "*"
     Else
-        rendered = escaped
-    End If
-
-    If Len(className) > 0 And Len(Trim$(rendered)) > 0 Then
-        StyledInlineSegment = "<span class=""" & HtmlAttributeEscape(className) & """>" & rendered & "</span>"
-    Else
-        StyledInlineSegment = rendered
+        StyledInlineSegment = escaped
     End If
 End Function
 
@@ -560,7 +616,9 @@ Private Function BuildThemeMarkdown(ByVal doc As Document, ByVal usedStyles As O
     defaultParagraphStyle = DefaultParagraphStyleName(doc, usedStyles)
 
     Dim i As Long
+    Dim styleYieldCounter As Long
     For i = LBound(keys) To UBound(keys)
+        YieldToWordUiEvery styleYieldCounter, 50
         Dim styleName As String
         styleName = CStr(keys(i))
         Dim cls As String
@@ -720,7 +778,9 @@ Private Function BuildStandardCss(ByVal doc As Document, ByVal usedStyles As Obj
     defaultParagraphStyle = DefaultParagraphStyleName(doc, usedStyles)
 
     Dim i As Long
+    Dim styleYieldCounter As Long
     For i = LBound(keys) To UBound(keys)
+        YieldToWordUiEvery styleYieldCounter, 50
         Dim styleName As String
         styleName = CStr(keys(i))
         Dim cls As String
@@ -743,7 +803,9 @@ Private Sub CollectUsedParagraphStyles(ByVal doc As Document, ByVal usedStyles A
     On Error Resume Next
 
     Dim p As Paragraph
+    Dim paragraphYieldCounter As Long
     For Each p In doc.StoryRanges(wdMainTextStory).Paragraphs
+        YieldToWordUiEvery paragraphYieldCounter, 20
         If Not p.Range.Information(wdWithInTable) Then
             Dim styleName As String
             styleName = StyleNameOfParagraph(p)
@@ -886,19 +948,102 @@ Private Function AppendClassAttribute(ByVal existingClasses As String, ByVal ext
     End If
 End Function
 
-Private Function CharacterClassForRange(ByVal doc As Document, ByVal rng As Range, ByVal baseStyleName As String, ByVal usedStyles As Object, ByVal generatedStyles As Object) As String
+Private Function WholeRangeCharacterKey(ByVal doc As Document, ByVal rng As Range, ByVal baseStyleName As String) As String
+    On Error GoTo Fail
+
+    Dim rr As Range
+    Set rr = rng.Duplicate
+    StripRangeEndMarks rr
+
+    Dim firstKey As String
+    Dim haveText As Boolean
+    Dim yieldCounter As Long
+
+    Dim i As Long
+    For i = rr.Start To rr.End - 1
+        YieldToWordUiEvery yieldCounter, 200
+
+        Dim cr As Range
+        Set cr = doc.Range(i, i + 1)
+
+        Dim ch As String
+        ch = NormalizeWordInlineText(cr.Text)
+        If Len(Trim$(ch)) > 0 Then
+            Dim characterKey As String
+            characterKey = CharacterFormattingKey(doc, cr, baseStyleName)
+            If Len(characterKey) = 0 Then
+                WholeRangeCharacterKey = ""
+                Exit Function
+            End If
+
+            If Not haveText Then
+                haveText = True
+                firstKey = characterKey
+            ElseIf characterKey <> firstKey Then
+                WholeRangeCharacterKey = ""
+                Exit Function
+            End If
+        End If
+    Next i
+
+    If haveText Then WholeRangeCharacterKey = firstKey
+    Exit Function
+
+Fail:
+    WholeRangeCharacterKey = ""
+End Function
+
+Private Function CharacterFormattingKey(ByVal doc As Document, ByVal rng As Range, ByVal baseStyleName As String) As String
     Dim characterStyleName As String
     characterStyleName = CharacterStyleNameOfRange(rng)
 
     If Len(characterStyleName) > 0 Then
-        AddUsedStyle usedStyles, characterStyleName
-        CharacterClassForRange = StyleClassName(characterStyleName)
+        CharacterFormattingKey = "style:" & characterStyleName
         Exit Function
     End If
 
     Dim props As String
     props = CharacterFormattingOverrideProperties(doc, rng, baseStyleName)
-    If Len(props) > 0 Then CharacterClassForRange = GeneratedStyleClassName(generatedStyles, props)
+    If Len(props) > 0 Then CharacterFormattingKey = "props:" & props
+End Function
+
+Private Function ClassAttributeForCharacterKey(ByVal characterKey As String, ByVal usedStyles As Object, ByVal generatedStyles As Object, ByVal recordClass As Boolean) As String
+    Dim cls As String
+    cls = CharacterClassNameForKey(characterKey, usedStyles, generatedStyles, recordClass)
+    If Len(cls) > 0 Then ClassAttributeForCharacterKey = "." & cls
+End Function
+
+Private Function CharacterClassNameForKey(ByVal characterKey As String, ByVal usedStyles As Object, ByVal generatedStyles As Object, ByVal recordClass As Boolean) As String
+    If Left$(characterKey, 6) = "style:" Then
+        Dim styleName As String
+        styleName = Mid$(characterKey, 7)
+        If recordClass Then AddUsedStyle usedStyles, styleName
+        CharacterClassNameForKey = StyleClassName(styleName)
+    ElseIf Left$(characterKey, 6) = "props:" Then
+        If recordClass Then CharacterClassNameForKey = GeneratedStyleClassName(generatedStyles, Mid$(characterKey, 7))
+    End If
+End Function
+
+Private Sub AddUnsupportedInlineStyleDiagnostic(ByVal doc As Document, ByVal diagnostics As Collection, ByVal macroProcedure As String, ByVal macroStep As String, ByVal characterKey As String, ByVal runStart As Long, ByVal runEnd As Long)
+    If Len(characterKey) = 0 Or runEnd <= runStart Then Exit Sub
+
+    Dim sourceRange As Range
+    Set sourceRange = doc.Range(runStart, runEnd)
+
+    Dim detail As String
+    detail = CharacterFormattingDiagnosticLabel(characterKey)
+
+    AddDiagnostic diagnostics, "Character-level " & detail & " was not emitted inline because md++ 0.14 has no portable inline attribute-list syntax. Whole-paragraph character formatting is promoted to a paragraph class instead.", macroProcedure, macroStep & " inline style", sourceRange, doc.Name, "inline-style", "start " & CStr(runStart) & " end " & CStr(runEnd), 0, ""
+End Sub
+
+Private Function CharacterFormattingDiagnosticLabel(ByVal characterKey As String) As String
+    If Left$(characterKey, 6) = "style:" Then
+        CharacterFormattingDiagnosticLabel = "style """ & Mid$(characterKey, 7) & """"
+    ElseIf Left$(characterKey, 6) = "props:" Then
+        CharacterFormattingDiagnosticLabel = "direct formatting"
+    Else
+        CharacterFormattingDiagnosticLabel = "formatting"
+    End If
 End Function
 
 Private Function CharacterStyleNameOfRange(ByVal rng As Range) As String
@@ -1310,7 +1455,9 @@ Private Function BuildCommentsSidecarJson(ByVal doc As Document) As String
     sb = sb & "  ""comments"": [" & vbCrLf
 
     Dim i As Long
+    Dim commentYieldCounter As Long
     For i = 1 To doc.Comments.Count
+        YieldToWordUiEvery commentYieldCounter, 20
         Dim c As Comment
         Set c = doc.Comments(i)
 
@@ -1541,6 +1688,7 @@ Private Sub ExtractImagesViaFilteredHtml(ByVal doc As Document, ByVal exportRoot
 
     Dim fileObj As Object
     For Each fileObj In fso.GetFolder(filesFolder).Files
+        YieldToWordUi
         If IsImageExtension(fso.GetExtensionName(fileObj.Name)) Then arr.Add fileObj.Path
     Next fileObj
     arr.Sort
@@ -1549,7 +1697,9 @@ Private Sub ExtractImagesViaFilteredHtml(ByVal doc As Document, ByVal exportRoot
     assetFolder = fso.BuildPath(exportRoot, "assets")
 
     Dim i As Long
+    Dim imageYieldCounter As Long
     For i = 0 To arr.Count - 1
+        YieldToWordUiEvery imageYieldCounter, 5
         stage = "copy image asset " & CStr(i + 1)
         Dim src As String
         Dim ext As String
@@ -1664,7 +1814,7 @@ End Function
 Private Function WordColorToCss(ByVal colorValue As Long) As String
     On Error GoTo Fail
 
-    If colorValue = wdColorAutomatic Or colorValue < 0 Then
+    If colorValue = wdColorAutomatic Or colorValue = wdUndefined Or colorValue < 0 Then
         WordColorToCss = ""
         Exit Function
     End If
@@ -1869,15 +2019,6 @@ End Function
 
 Private Function HtmlCommentSafe(ByVal textValue As String) As String
     HtmlCommentSafe = Replace(textValue, "--", "- -")
-End Function
-
-Private Function HtmlAttributeEscape(ByVal textValue As String) As String
-    Dim s As String
-    s = Replace(textValue, "&", "&amp;")
-    s = Replace(s, """", "&quot;")
-    s = Replace(s, "<", "&lt;")
-    s = Replace(s, ">", "&gt;")
-    HtmlAttributeEscape = s
 End Function
 
 Private Function Slugify(ByVal textValue As String) As String
