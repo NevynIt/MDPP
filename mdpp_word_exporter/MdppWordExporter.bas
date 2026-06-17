@@ -151,6 +151,18 @@ Private Function BuildRootMarkdown(ByVal doc As Document, ByVal imageFiles As Co
     Dim imageIndex As Long
     imageIndex = 1
 
+    Dim inlineShapeCount As Long
+    inlineShapeCount = doc.InlineShapes.Count
+
+    If inlineShapeCount > 0 Then
+        If imageFiles.Count > inlineShapeCount Then
+            AddDiagnostic diagnostics, "Word filtered HTML exported more image files than Word inline image anchors. The exporter emitted every extracted file in export order, grouped across the available inline image anchors.", "BuildRootMarkdown", "map extracted image files to inline anchors", Nothing, doc.Name, "document", "", 0, ""
+        End If
+    End If
+
+    Dim inlineShapeOrdinal As Long
+    inlineShapeOrdinal = 0
+
     Dim p As Paragraph
     For Each p In mainRange.Paragraphs
         Do While nextTable <= tables.Count
@@ -176,8 +188,21 @@ Private Function BuildRootMarkdown(ByVal doc As Document, ByVal imageFiles As Co
 
             Dim ils As InlineShape
             For Each ils In p.Range.InlineShapes
-                sb = sb & InlineShapeMarkdown(imageIndex, imageFiles, diagnostics, ils.Range, doc.Name) & vbCrLf & vbCrLf
-                imageIndex = imageIndex + 1
+                inlineShapeOrdinal = inlineShapeOrdinal + 1
+
+                Dim imagesForAnchor As Long
+                imagesForAnchor = ImagesToEmitForAnchor(imageIndex, imageFiles.Count, inlineShapeOrdinal, inlineShapeCount)
+
+                If imagesForAnchor = 0 Then
+                    sb = sb & InlineShapeMarkdown(imageIndex, imageFiles, diagnostics, ils.Range, doc.Name) & vbCrLf & vbCrLf
+                    imageIndex = imageIndex + 1
+                Else
+                    Dim imageGroupOffset As Long
+                    For imageGroupOffset = 1 To imagesForAnchor
+                        sb = sb & InlineShapeMarkdown(imageIndex, imageFiles, diagnostics, ils.Range, doc.Name) & vbCrLf & vbCrLf
+                        imageIndex = imageIndex + 1
+                    Next imageGroupOffset
+                End If
             Next ils
         End If
     Next p
@@ -300,6 +325,29 @@ Private Function InlineShapeMarkdown(ByVal imageIndex As Long, ByVal imageFiles 
     End If
 
     InlineShapeMarkdown = "![Image " & CStr(imageIndex) & "](" & rel & "){.word-image}"
+End Function
+
+Private Function ImagesToEmitForAnchor(ByVal nextImageIndex As Long, ByVal imageFileCount As Long, ByVal inlineShapeOrdinal As Long, ByVal inlineShapeCount As Long) As Long
+    If nextImageIndex > imageFileCount Then
+        ImagesToEmitForAnchor = 0
+        Exit Function
+    End If
+
+    If imageFileCount <= inlineShapeCount Then
+        ImagesToEmitForAnchor = 1
+        Exit Function
+    End If
+
+    Dim remainingImages As Long
+    Dim remainingAnchors As Long
+    remainingImages = imageFileCount - nextImageIndex + 1
+    remainingAnchors = inlineShapeCount - inlineShapeOrdinal + 1
+
+    If remainingAnchors <= 1 Then
+        ImagesToEmitForAnchor = remainingImages
+    Else
+        ImagesToEmitForAnchor = (remainingImages + remainingAnchors - 1) \ remainingAnchors
+    End If
 End Function
 
 Private Function InlineRangeToMarkdown(ByVal doc As Document, ByVal rng As Range, ByVal diagnostics As Collection, ByVal macroProcedure As String, ByVal macroStep As String) As String
@@ -1080,8 +1128,6 @@ Private Sub ExtractImagesViaFilteredHtml(ByVal doc As Document, ByVal exportRoot
     Next fileObj
     arr.Sort
 
-    Set arr = SelectPrimaryImageFiles(fso, arr, doc.InlineShapes.Count, diagnostics, doc.Name)
-
     Dim assetFolder As String
     assetFolder = fso.BuildPath(exportRoot, "assets")
 
@@ -1126,67 +1172,6 @@ Fail:
     On Error GoTo 0
     AddDiagnostic diagnostics, "Image extraction failed.", "ExtractImagesViaFilteredHtml", stage, Nothing, doc.Name, "document", "", errNumber, errDescription
 End Sub
-
-Private Function SelectPrimaryImageFiles(ByVal fso As Object, ByVal imagePaths As Object, ByVal expectedCount As Long, ByVal diagnostics As Collection, ByVal sourceName As String) As Object
-    If expectedCount <= 0 Or imagePaths.Count <= expectedCount Then
-        Set SelectPrimaryImageFiles = imagePaths
-        Exit Function
-    End If
-
-    Dim selectedIndexes As Object
-    Set selectedIndexes = CreateObject("Scripting.Dictionary")
-
-    Dim pick As Long
-    For pick = 1 To expectedCount
-        Dim bestIndex As Long
-        Dim bestSize As Double
-        bestIndex = -1
-        bestSize = -1
-
-        Dim i As Long
-        For i = 0 To imagePaths.Count - 1
-            If Not selectedIndexes.Exists(CStr(i)) Then
-                Dim sizeValue As Double
-                sizeValue = ImageFileSize(fso, CStr(imagePaths(i)))
-                If sizeValue > bestSize Then
-                    bestSize = sizeValue
-                    bestIndex = i
-                End If
-            End If
-        Next i
-
-        If bestIndex >= 0 Then selectedIndexes.Add CStr(bestIndex), True
-    Next pick
-
-    Dim orderedIndexes As Object
-    Set orderedIndexes = CreateObject("System.Collections.ArrayList")
-
-    Dim key As Variant
-    For Each key In selectedIndexes.Keys
-        orderedIndexes.Add CLng(key)
-    Next key
-    orderedIndexes.Sort
-
-    Dim selectedPaths As Object
-    Set selectedPaths = CreateObject("System.Collections.ArrayList")
-
-    For i = 0 To orderedIndexes.Count - 1
-        selectedPaths.Add CStr(imagePaths(CLng(orderedIndexes(i))))
-    Next i
-
-    AddDiagnostic diagnostics, "Word filtered HTML produced " & CStr(imagePaths.Count) & " image files for " & CStr(expectedCount) & " inline image locations; the exporter kept the largest primary candidates in export order and ignored smaller companion artifacts.", "ExtractImagesViaFilteredHtml", "select primary image files", Nothing, sourceName, "document", "", 0, ""
-
-    Set SelectPrimaryImageFiles = selectedPaths
-End Function
-
-Private Function ImageFileSize(ByVal fso As Object, ByVal filePath As String) As Double
-    On Error GoTo Fail
-    ImageFileSize = CDbl(fso.GetFile(filePath).Size)
-    Exit Function
-
-Fail:
-    ImageFileSize = 0
-End Function
 
 Private Function IsImageExtension(ByVal ext As String) As Boolean
     ext = LCase$(ext)
