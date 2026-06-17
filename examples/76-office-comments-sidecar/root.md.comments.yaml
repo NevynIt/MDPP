@@ -1,0 +1,8 @@
+source: office-comments.docx
+comments:
+  - id: c1
+    target: '#reviewed-section'
+    author: Reviewer One
+    created: '2026-06-17T12:00:00Z'
+    text: Confirm this section before publication.
+    resolved: false
