@@ -1,0 +1,1170 @@
+Attribute VB_Name = "MdppWordExporter"
+Option Explicit
+
+' md++ Word Exporter
+' Exports a normal Word document to a semantic md++ bundle:
+'   root.md
+'   themes/word-import.theme.md
+'   layouts/word-report.layout.md
+'   styles/mdpp-word-base.css
+'   comments/comments.sidecar.json
+'   comments/import-diagnostics.json
+'   assets/*
+'
+' Import this .bas file into Word VBA, then run ExportActiveDocumentToMdpp.
+
+Private Const MDPP_PROFILE_VERSION As String = "0.14"
+Private Const DEFAULT_THEME_FILE As String = "./themes/word-import.theme.md"
+Private Const DEFAULT_LAYOUT_FILE As String = "./layouts/word-report.layout.md"
+Private Const DEFAULT_STYLESHEET_FILE As String = "./styles/mdpp-word-base.css"
+
+Public Sub ExportActiveDocumentToMdpp()
+    If ActiveDocument Is Nothing Then
+        MsgBox "No active document.", vbExclamation
+        Exit Sub
+    End If
+
+    Dim exportRoot As String
+    exportRoot = PickExportFolder()
+    If Len(exportRoot) = 0 Then Exit Sub
+
+    ExportActiveDocumentToMdppFolder exportRoot
+End Sub
+
+Public Sub ExportActiveDocumentToMdppFolder(ByVal exportRoot As String)
+    On Error GoTo Fail
+
+    Dim doc As Document
+    Set doc = ActiveDocument
+
+    Dim fso As Object
+    Set fso = CreateObject("Scripting.FileSystemObject")
+
+    exportRoot = Trim$(exportRoot)
+    If Len(exportRoot) = 0 Then Err.Raise vbObjectError + 100, , "Export folder is empty."
+
+    EnsureFolder fso, exportRoot
+    EnsureFolder fso, fso.BuildPath(exportRoot, "themes")
+    EnsureFolder fso, fso.BuildPath(exportRoot, "layouts")
+    EnsureFolder fso, fso.BuildPath(exportRoot, "styles")
+    EnsureFolder fso, fso.BuildPath(exportRoot, "assets")
+    EnsureFolder fso, fso.BuildPath(exportRoot, "comments")
+
+    Dim usedStyles As Object
+    Set usedStyles = CreateObject("Scripting.Dictionary")
+
+    Dim diagnostics As Collection
+    Set diagnostics = New Collection
+
+    Dim imageFiles As Collection
+    Set imageFiles = New Collection
+    ExtractImagesViaFilteredHtml doc, exportRoot, imageFiles, diagnostics
+
+    CollectUsedParagraphStyles doc, usedStyles
+
+    Dim rootMd As String
+    rootMd = BuildRootMarkdown(doc, imageFiles, usedStyles, diagnostics)
+
+    Dim themeMd As String
+    themeMd = BuildThemeMarkdown(doc, usedStyles)
+
+    Dim layoutMd As String
+    layoutMd = BuildLayoutMarkdown(doc)
+
+    Dim css As String
+    css = BuildStandardCss(doc, usedStyles)
+
+    Dim commentsJson As String
+    commentsJson = BuildCommentsSidecarJson(doc)
+
+    Dim diagnosticsJson As String
+    diagnosticsJson = BuildImportDiagnosticsJson(doc, diagnostics)
+
+    WriteUtf8 fso.BuildPath(exportRoot, "root.md"), rootMd
+    WriteUtf8 fso.BuildPath(fso.BuildPath(exportRoot, "themes"), "word-import.theme.md"), themeMd
+    WriteUtf8 fso.BuildPath(fso.BuildPath(exportRoot, "layouts"), "word-report.layout.md"), layoutMd
+    WriteUtf8 fso.BuildPath(fso.BuildPath(exportRoot, "styles"), "mdpp-word-base.css"), css
+    WriteUtf8 fso.BuildPath(fso.BuildPath(exportRoot, "comments"), "comments.sidecar.json"), commentsJson
+    WriteUtf8 fso.BuildPath(fso.BuildPath(exportRoot, "comments"), "import-diagnostics.json"), diagnosticsJson
+
+    MsgBox "md++ export completed:" & vbCrLf & exportRoot, vbInformation
+    Exit Sub
+
+Fail:
+    MsgBox "md++ export failed: " & Err.Description, vbCritical
+End Sub
+
+Private Function PickExportFolder() As String
+    On Error GoTo Fail
+
+    Dim dlg As FileDialog
+    Set dlg = Application.FileDialog(4) ' msoFileDialogFolderPicker
+    dlg.Title = "Choose md++ export folder"
+    dlg.AllowMultiSelect = False
+
+    If dlg.Show <> -1 Then
+        PickExportFolder = ""
+    Else
+        PickExportFolder = dlg.SelectedItems(1)
+    End If
+    Exit Function
+
+Fail:
+    PickExportFolder = InputBox("Enter export folder path:", "md++ export")
+End Function
+
+Private Function BuildRootMarkdown(ByVal doc As Document, ByVal imageFiles As Collection, ByVal usedStyles As Object, ByVal diagnostics As Collection) As String
+    Dim title As String
+    title = DocumentTitle(doc)
+
+    Dim sb As String
+    sb = "[md:profile]: md++" & vbCrLf
+    sb = sb & "[md:profile-version]: " & MDPP_PROFILE_VERSION & vbCrLf
+    sb = sb & "[md:title]: <" & MdDirectiveText(title) & ">" & vbCrLf
+    sb = sb & "[md:theme]: " & DEFAULT_THEME_FILE & vbCrLf
+    sb = sb & "[md:layout]: " & DEFAULT_LAYOUT_FILE & vbCrLf
+    sb = sb & "[md:stylesheet]: " & DEFAULT_STYLESHEET_FILE & vbCrLf
+    sb = sb & vbCrLf
+    sb = sb & "<!-- mdpp-import-source: " & HtmlCommentSafe(doc.Name) & " -->" & vbCrLf
+    sb = sb & "<!-- mdpp-sidecar-comments: ./comments/comments.sidecar.json -->" & vbCrLf
+    sb = sb & "<!-- mdpp-sidecar-diagnostics: ./comments/import-diagnostics.json -->" & vbCrLf
+    sb = sb & vbCrLf
+
+    If doc.Shapes.Count > 0 Then
+        diagnostics.Add "Floating shapes are not placed in source order. Convert important floating shapes to inline pictures before export, or review the assets manually."
+        sb = sb & "<!-- mdpp-import-warning: floating Word shapes are not placed in source order by this exporter. -->" & vbCrLf & vbCrLf
+    End If
+
+    Dim mainRange As Range
+    Set mainRange = doc.StoryRanges(wdMainTextStory)
+
+    Dim tables As Tables
+    Set tables = mainRange.Tables
+
+    Dim nextTable As Long
+    nextTable = 1
+
+    Dim imageIndex As Long
+    imageIndex = 1
+
+    Dim p As Paragraph
+    For Each p In mainRange.Paragraphs
+        Do While nextTable <= tables.Count
+            Dim pendingTable As Table
+            Set pendingTable = tables(nextTable)
+
+            ' VBA does not short-circuit And, so keep the bounds check separate from table indexing.
+            If pendingTable.Range.Start > p.Range.Start Then Exit Do
+
+            sb = sb & TableToMarkdown(doc, pendingTable, usedStyles) & vbCrLf & vbCrLf
+            nextTable = nextTable + 1
+        Loop
+
+        If Not p.Range.Information(wdWithInTable) Then
+            Dim paraMd As String
+            paraMd = ParagraphToMarkdown(doc, p, usedStyles)
+            If Len(paraMd) > 0 Then
+                sb = sb & paraMd & vbCrLf & vbCrLf
+            End If
+
+            Dim ils As InlineShape
+            For Each ils In p.Range.InlineShapes
+                sb = sb & InlineShapeMarkdown(imageIndex, imageFiles) & vbCrLf & vbCrLf
+                imageIndex = imageIndex + 1
+            Next ils
+        End If
+    Next p
+
+    Do While nextTable <= tables.Count
+        sb = sb & TableToMarkdown(doc, tables(nextTable), usedStyles) & vbCrLf & vbCrLf
+        nextTable = nextTable + 1
+    Loop
+
+    BuildRootMarkdown = NormalizeLineEndings(sb)
+End Function
+
+Private Function ParagraphToMarkdown(ByVal doc As Document, ByVal p As Paragraph, ByVal usedStyles As Object) As String
+    Dim txt As String
+    txt = Trim$(InlineRangeToMarkdown(doc, p.Range))
+    If Len(txt) = 0 Then
+        ParagraphToMarkdown = ""
+        Exit Function
+    End If
+
+    Dim styleName As String
+    styleName = StyleNameOfParagraph(p)
+
+    Dim classAttr As String
+    classAttr = ClassAttributeForStyle(styleName, False)
+
+    Dim headingLevel As Long
+    headingLevel = HeadingLevelOfParagraph(p)
+
+    If headingLevel >= 1 And headingLevel <= 6 Then
+        ParagraphToMarkdown = String$(headingLevel, "#") & " " & txt & InlineAttribute(classAttr)
+        Exit Function
+    End If
+
+    If IsListParagraph(p) Then
+        ParagraphToMarkdown = ListPrefix(p) & txt
+        Exit Function
+    End If
+
+    ParagraphToMarkdown = txt & InlineAttribute(classAttr)
+End Function
+
+Private Function TableToMarkdown(ByVal doc As Document, ByVal tbl As Table, ByVal usedStyles As Object) As String
+    On Error GoTo Fail
+
+    Dim rowsCount As Long
+    Dim colsCount As Long
+    rowsCount = tbl.Rows.Count
+    colsCount = tbl.Columns.Count
+
+    If rowsCount = 0 Or colsCount = 0 Then
+        TableToMarkdown = ""
+        Exit Function
+    End If
+
+    Dim sb As String
+    Dim r As Long, c As Long
+
+    sb = ""
+    For c = 1 To colsCount
+        sb = sb & "| " & MarkdownTableCell(CellTextMarkdown(doc, tbl, 1, c)) & " "
+    Next c
+    sb = sb & "|" & vbCrLf
+
+    For c = 1 To colsCount
+        sb = sb & "|---"
+    Next c
+    sb = sb & "|" & vbCrLf
+
+    If rowsCount >= 2 Then
+        For r = 2 To rowsCount
+            For c = 1 To colsCount
+                sb = sb & "| " & MarkdownTableCell(CellTextMarkdown(doc, tbl, r, c)) & " "
+            Next c
+            sb = sb & "|" & vbCrLf
+        Next r
+    End If
+
+    TableToMarkdown = sb
+    Exit Function
+
+Fail:
+    TableToMarkdown = "<!-- mdpp-import-warning: table could not be converted cleanly. -->"
+End Function
+
+Private Function CellTextMarkdown(ByVal doc As Document, ByVal tbl As Table, ByVal rowIndex As Long, ByVal colIndex As Long) As String
+    On Error GoTo Fail
+
+    Dim cellRange As Range
+    Set cellRange = tbl.Cell(rowIndex, colIndex).Range.Duplicate
+    StripRangeEndMarks cellRange
+    CellTextMarkdown = Trim$(InlineRangeToMarkdown(doc, cellRange))
+    Exit Function
+
+Fail:
+    CellTextMarkdown = ""
+End Function
+
+Private Function InlineShapeMarkdown(ByVal imageIndex As Long, ByVal imageFiles As Collection) As String
+    Dim rel As String
+    If imageIndex <= imageFiles.Count Then
+        rel = "assets/" & CStr(imageFiles(imageIndex))
+    Else
+        rel = "assets/image-" & Format$(imageIndex, "000") & ".png"
+    End If
+
+    InlineShapeMarkdown = "![Image " & CStr(imageIndex) & "](" & rel & "){.word-image}"
+End Function
+
+Private Function InlineRangeToMarkdown(ByVal doc As Document, ByVal rng As Range) As String
+    On Error GoTo PlainFallback
+
+    Dim rr As Range
+    Set rr = rng.Duplicate
+    StripRangeEndMarks rr
+
+    If rr.End <= rr.Start Then
+        InlineRangeToMarkdown = ""
+        Exit Function
+    End If
+
+    If rr.Hyperlinks.Count = 0 Then
+        InlineRangeToMarkdown = FormatCharsMarkdown(doc, rr.Start, rr.End)
+        Exit Function
+    End If
+
+    Dim sb As String
+    Dim pos As Long
+    pos = rr.Start
+
+    Dim h As Hyperlink
+    For Each h In rr.Hyperlinks
+        If h.Range.Start > pos Then
+            sb = sb & FormatCharsMarkdown(doc, pos, h.Range.Start)
+        End If
+
+        Dim labelText As String
+        labelText = CleanRangeText(h.Range.Text)
+        If Len(labelText) = 0 Then labelText = h.Address
+
+        Dim target As String
+        target = h.Address
+        If Len(h.SubAddress) > 0 Then
+            If Len(target) > 0 Then
+                target = target & "#" & h.SubAddress
+            Else
+                target = "#" & h.SubAddress
+            End If
+        End If
+
+        If Len(target) > 0 Then
+            sb = sb & "[" & MarkdownEscapeInline(labelText) & "](" & MarkdownEscapeUrl(target) & ")"
+        Else
+            sb = sb & MarkdownEscapeInline(labelText)
+        End If
+
+        pos = h.Range.End
+    Next h
+
+    If pos < rr.End Then
+        sb = sb & FormatCharsMarkdown(doc, pos, rr.End)
+    End If
+
+    InlineRangeToMarkdown = sb
+    Exit Function
+
+PlainFallback:
+    InlineRangeToMarkdown = MarkdownEscapeInline(CleanRangeText(rng.Text))
+End Function
+
+Private Function FormatCharsMarkdown(ByVal doc As Document, ByVal startPos As Long, ByVal endPos As Long) As String
+    On Error GoTo Fail
+
+    Dim sb As String
+    Dim seg As String
+    Dim currentBold As Boolean
+    Dim currentItalic As Boolean
+    Dim initialized As Boolean
+
+    Dim i As Long
+    For i = startPos To endPos - 1
+        Dim cr As Range
+        Set cr = doc.Range(i, i + 1)
+
+        Dim ch As String
+        ch = cr.Text
+        If ch <> Chr$(13) And ch <> Chr$(7) Then
+            If ch = vbTab Then ch = " "
+
+            Dim isBold As Boolean
+            Dim isItalic As Boolean
+            isBold = (cr.Font.Bold <> 0)
+            isItalic = (cr.Font.Italic <> 0)
+
+            If Not initialized Then
+                initialized = True
+                currentBold = isBold
+                currentItalic = isItalic
+            End If
+
+            If isBold <> currentBold Or isItalic <> currentItalic Then
+                sb = sb & StyledInlineSegment(seg, currentBold, currentItalic)
+                seg = ""
+                currentBold = isBold
+                currentItalic = isItalic
+            End If
+
+            seg = seg & ch
+        End If
+    Next i
+
+    If Len(seg) > 0 Then
+        sb = sb & StyledInlineSegment(seg, currentBold, currentItalic)
+    End If
+
+    FormatCharsMarkdown = sb
+    Exit Function
+
+Fail:
+    FormatCharsMarkdown = ""
+End Function
+
+Private Function StyledInlineSegment(ByVal textValue As String, ByVal isBold As Boolean, ByVal isItalic As Boolean) As String
+    Dim escaped As String
+    escaped = MarkdownEscapeInline(textValue)
+
+    If Len(Trim$(escaped)) = 0 Then
+        StyledInlineSegment = escaped
+    ElseIf isBold And isItalic Then
+        StyledInlineSegment = "***" & escaped & "***"
+    ElseIf isBold Then
+        StyledInlineSegment = "**" & escaped & "**"
+    ElseIf isItalic Then
+        StyledInlineSegment = "*" & escaped & "*"
+    Else
+        StyledInlineSegment = escaped
+    End If
+End Function
+
+Private Function BuildThemeMarkdown(ByVal doc As Document, ByVal usedStyles As Object) As String
+    Dim bodyFont As String
+    bodyFont = DefaultBodyFont(doc)
+
+    Dim headingFont As String
+    headingFont = StyleFontName(doc, "Heading 1", bodyFont)
+
+    Dim sb As String
+    sb = "# Word Import Theme" & vbCrLf & vbCrLf
+    sb = sb & "[md:profile]: md++" & vbCrLf
+    sb = sb & "[md:profile-version]: " & MDPP_PROFILE_VERSION & vbCrLf
+    sb = sb & "[md:title]: <Word Import Theme>" & vbCrLf
+    sb = sb & "[md:layout]: ../layouts/word-report.layout.md" & vbCrLf
+    sb = sb & "[md:stylesheet]: ../styles/mdpp-word-base.css" & vbCrLf & vbCrLf
+
+    sb = sb & "## colors" & vbCrLf
+    sb = sb & "text: #222222" & vbCrLf
+    sb = sb & "background: #ffffff" & vbCrLf
+    sb = sb & "border: #d0d7de" & vbCrLf
+    sb = sb & "muted: #667085" & vbCrLf
+    sb = sb & "accent: #204080" & vbCrLf & vbCrLf
+
+    sb = sb & "## fonts" & vbCrLf
+    sb = sb & "body: " & ThemeValue(bodyFont & ", sans-serif") & vbCrLf
+    sb = sb & "heading: " & ThemeValue(headingFont & ", sans-serif") & vbCrLf
+    sb = sb & "code: Consolas, monospace" & vbCrLf & vbCrLf
+
+    sb = sb & "## spacing" & vbCrLf
+    sb = sb & "small: 4px" & vbCrLf
+    sb = sb & "medium: 12px" & vbCrLf
+    sb = sb & "large: 24px" & vbCrLf & vbCrLf
+
+    sb = sb & "## component table" & vbCrLf
+    sb = sb & "border: 1px solid {colors.border}" & vbCrLf
+    sb = sb & "header-background: #f6f8fa" & vbCrLf
+    sb = sb & "cell-padding: 6px 8px" & vbCrLf & vbCrLf
+
+    sb = sb & "## component image" & vbCrLf
+    sb = sb & "max-width: 100%" & vbCrLf
+    sb = sb & "caption-class: word-caption" & vbCrLf & vbCrLf
+
+    sb = sb & BuildPageFurnitureTheme(doc)
+
+    Dim keys As Variant
+    keys = SortedDictionaryKeys(usedStyles)
+
+    Dim i As Long
+    For i = LBound(keys) To UBound(keys)
+        Dim styleName As String
+        styleName = CStr(keys(i))
+        Dim cls As String
+        cls = StyleClassName(styleName)
+        If Len(cls) > 0 Then
+            sb = sb & "## class " & cls & vbCrLf
+            sb = sb & ThemePropertiesForStyle(doc, styleName)
+            sb = sb & vbCrLf
+        End If
+    Next i
+
+    BuildThemeMarkdown = NormalizeLineEndings(sb)
+End Function
+
+Private Function BuildPageFurnitureTheme(ByVal doc As Document) As String
+    Dim headerText As String
+    Dim footerText As String
+
+    On Error Resume Next
+    headerText = CleanHeaderFooterText(doc.Sections(1).Headers(wdHeaderFooterPrimary).Range)
+    footerText = CleanHeaderFooterText(doc.Sections(1).Footers(wdHeaderFooterPrimary).Range)
+    On Error GoTo 0
+
+    Dim sb As String
+    sb = "## page-furniture word-report" & vbCrLf
+    If Len(headerText) > 0 Then
+        sb = sb & "header-center: " & ThemeValue(headerText) & vbCrLf
+    Else
+        sb = sb & "header-left: {document.title}" & vbCrLf
+        sb = sb & "header-right: {section.title}" & vbCrLf
+    End If
+
+    If Len(footerText) > 0 Then
+        sb = sb & "footer-center: " & ThemeValue(footerText) & vbCrLf
+    Else
+        sb = sb & "footer-center: {page.number} / {page.count}" & vbCrLf
+    End If
+    sb = sb & "number-format: {page.number} / {page.count}" & vbCrLf & vbCrLf
+
+    BuildPageFurnitureTheme = sb
+End Function
+
+Private Function BuildLayoutMarkdown(ByVal doc As Document) As String
+    Dim ps As PageSetup
+    Set ps = doc.PageSetup
+
+    Dim orientationText As String
+    If ps.Orientation = wdOrientLandscape Then
+        orientationText = "landscape"
+    Else
+        orientationText = "portrait"
+    End If
+
+    Dim canvasText As String
+    canvasText = PaperSizeText(ps)
+
+    Dim padTop As String, padRight As String, padBottom As String, padLeft As String
+    padTop = PointsToMmText(ps.TopMargin)
+    padRight = PointsToMmText(ps.RightMargin)
+    padBottom = PointsToMmText(ps.BottomMargin)
+    padLeft = PointsToMmText(ps.LeftMargin)
+
+    Dim sb As String
+    sb = "# word-report" & vbCrLf & vbCrLf
+    sb = sb & "canvas-size: " & canvasText & vbCrLf
+    sb = sb & "orientation: " & orientationText & vbCrLf
+    sb = sb & "canvas-padding: " & padTop & " " & padRight & " " & padBottom & " " & padLeft & vbCrLf
+    sb = sb & "gap: 0" & vbCrLf
+    sb = sb & "page-furniture: word-report" & vbCrLf & vbCrLf
+    sb = sb & "|      | 1fr  |" & vbCrLf
+    sb = sb & "|------|------|" & vbCrLf
+    sb = sb & "| 1fr  | body |" & vbCrLf & vbCrLf
+    sb = sb & "body:" & vbCrLf
+    sb = sb & "  flow: >body" & vbCrLf
+
+    BuildLayoutMarkdown = sb
+End Function
+
+Private Function BuildStandardCss(ByVal doc As Document, ByVal usedStyles As Object) As String
+    Dim sb As String
+    sb = "/* md++ Word import base stylesheet" & vbCrLf
+    sb = sb & "   Generated by MdppWordExporter.bas. Safe to edit after export. */" & vbCrLf & vbCrLf
+
+    sb = sb & ".mdpp-document {" & vbCrLf
+    sb = sb & "  box-sizing: border-box;" & vbCrLf
+    sb = sb & "  color: var(--md-colors-text, #222);" & vbCrLf
+    sb = sb & "  background: var(--md-colors-background, #fff);" & vbCrLf
+    sb = sb & "  font-family: var(--md-fonts-body, Calibri, Arial, sans-serif);" & vbCrLf
+    sb = sb & "  line-height: 1.35;" & vbCrLf
+    sb = sb & "}" & vbCrLf & vbCrLf
+
+    sb = sb & ".mdpp-document *, .mdpp-document *::before, .mdpp-document *::after { box-sizing: inherit; }" & vbCrLf & vbCrLf
+
+    sb = sb & ".mdpp-heading {" & vbCrLf
+    sb = sb & "  font-family: var(--md-fonts-heading, var(--md-fonts-body, Calibri, Arial, sans-serif));" & vbCrLf
+    sb = sb & "  line-height: 1.2;" & vbCrLf
+    sb = sb & "  margin: 1.2em 0 0.4em;" & vbCrLf
+    sb = sb & "}" & vbCrLf & vbCrLf
+
+    sb = sb & ".mdpp-paragraph { margin: 0 0 0.75em; }" & vbCrLf
+    sb = sb & ".mdpp-list { margin: 0 0 0.75em 1.5em; padding-left: 1.2em; }" & vbCrLf
+    sb = sb & ".mdpp-blockquote { border-left: 4px solid var(--md-colors-border, #d0d7de); margin: 1em 0; padding-left: 1em; color: var(--md-colors-muted, #667085); }" & vbCrLf & vbCrLf
+
+    sb = sb & ".mdpp-table {" & vbCrLf
+    sb = sb & "  width: 100%;" & vbCrLf
+    sb = sb & "  border-collapse: collapse;" & vbCrLf
+    sb = sb & "  margin: 1em 0;" & vbCrLf
+    sb = sb & "}" & vbCrLf
+    sb = sb & ".mdpp-table th, .mdpp-table td, .mdpp-document table th, .mdpp-document table td {" & vbCrLf
+    sb = sb & "  border: 1px solid var(--md-colors-border, #d0d7de);" & vbCrLf
+    sb = sb & "  padding: 6px 8px;" & vbCrLf
+    sb = sb & "  vertical-align: top;" & vbCrLf
+    sb = sb & "}" & vbCrLf
+    sb = sb & ".mdpp-table th, .mdpp-document table th { background: #f6f8fa; font-weight: 700; }" & vbCrLf & vbCrLf
+
+    sb = sb & ".word-image, .mdpp-image { max-width: 100%; height: auto; }" & vbCrLf & vbCrLf
+
+    sb = sb & ".mdpp-page {" & vbCrLf
+    sb = sb & "  position: relative;" & vbCrLf
+    sb = sb & "  background: var(--md-colors-background, #fff);" & vbCrLf
+    sb = sb & "}" & vbCrLf
+    sb = sb & ".mdpp-page-header, .mdpp-page-footer {" & vbCrLf
+    sb = sb & "  font-size: 0.85em;" & vbCrLf
+    sb = sb & "  color: var(--md-colors-muted, #667085);" & vbCrLf
+    sb = sb & "}" & vbCrLf & vbCrLf
+
+    sb = sb & "/* Word style classes generated from the source document. */" & vbCrLf
+
+    Dim keys As Variant
+    keys = SortedDictionaryKeys(usedStyles)
+
+    Dim i As Long
+    For i = LBound(keys) To UBound(keys)
+        Dim styleName As String
+        styleName = CStr(keys(i))
+        Dim cls As String
+        cls = StyleClassName(styleName)
+        If Len(cls) > 0 Then
+            sb = sb & "." & CssIdentifier(cls) & " {" & vbCrLf
+            sb = sb & CssPropertiesForStyle(doc, styleName)
+            sb = sb & "}" & vbCrLf & vbCrLf
+        End If
+    Next i
+
+    BuildStandardCss = NormalizeLineEndings(sb)
+End Function
+
+Private Sub CollectUsedParagraphStyles(ByVal doc As Document, ByVal usedStyles As Object)
+    On Error Resume Next
+
+    Dim p As Paragraph
+    For Each p In doc.StoryRanges(wdMainTextStory).Paragraphs
+        If Not p.Range.Information(wdWithInTable) Then
+            Dim styleName As String
+            styleName = StyleNameOfParagraph(p)
+            If Len(styleName) > 0 Then
+                If Not usedStyles.Exists(styleName) Then usedStyles.Add styleName, True
+            End If
+        End If
+    Next p
+End Sub
+
+Private Function StyleNameOfParagraph(ByVal p As Paragraph) As String
+    On Error GoTo Fail
+    StyleNameOfParagraph = CStr(p.Style)
+    Exit Function
+Fail:
+    StyleNameOfParagraph = "Normal"
+End Function
+
+Private Function HeadingLevelOfParagraph(ByVal p As Paragraph) As Long
+    On Error Resume Next
+
+    If p.OutlineLevel >= wdOutlineLevel1 And p.OutlineLevel <= wdOutlineLevel6 Then
+        HeadingLevelOfParagraph = p.OutlineLevel
+        Exit Function
+    End If
+
+    Dim s As String
+    s = LCase$(StyleNameOfParagraph(p))
+    If Left$(s, 8) = "heading " Then
+        HeadingLevelOfParagraph = CLng(Val(Mid$(s, 9)))
+    Else
+        HeadingLevelOfParagraph = 0
+    End If
+End Function
+
+Private Function IsListParagraph(ByVal p As Paragraph) As Boolean
+    On Error GoTo Fail
+    IsListParagraph = (p.Range.ListFormat.ListType <> wdListNoNumbering)
+    Exit Function
+Fail:
+    IsListParagraph = False
+End Function
+
+Private Function ListPrefix(ByVal p As Paragraph) As String
+    On Error GoTo Fail
+
+    Dim level As Long
+    level = p.Range.ListFormat.ListLevelNumber
+    If level < 1 Then level = 1
+
+    Dim indent As String
+    indent = String$((level - 1) * 2, " ")
+
+    Select Case p.Range.ListFormat.ListType
+        Case wdListSimpleNumbering, wdListOutlineNumbering, wdListMixedNumbering, wdListListNumOnly
+            ListPrefix = indent & "1. "
+        Case Else
+            ListPrefix = indent & "- "
+    End Select
+    Exit Function
+
+Fail:
+    ListPrefix = "- "
+End Function
+
+Private Function ClassAttributeForStyle(ByVal styleName As String, ByVal includeNormal As Boolean) As String
+    Dim cls As String
+    cls = StyleClassName(styleName)
+    If Len(cls) = 0 Then
+        ClassAttributeForStyle = ""
+    ElseIf Not includeNormal And LCase$(styleName) = "normal" Then
+        ClassAttributeForStyle = ""
+    Else
+        ClassAttributeForStyle = "." & cls
+    End If
+End Function
+
+Private Function InlineAttribute(ByVal attrClass As String) As String
+    If Len(attrClass) = 0 Then
+        InlineAttribute = ""
+    Else
+        InlineAttribute = " {" & attrClass & "}"
+    End If
+End Function
+
+Private Function StyleClassName(ByVal styleName As String) As String
+    Dim slug As String
+    slug = Slugify(styleName)
+    If Len(slug) = 0 Then
+        StyleClassName = ""
+    Else
+        StyleClassName = "word-style-" & slug
+    End If
+End Function
+
+Private Function ThemePropertiesForStyle(ByVal doc As Document, ByVal styleName As String) As String
+    Dim props As String
+    props = CssPropertiesForStyle(doc, styleName)
+    props = Replace(props, "  ", "")
+    props = Replace(props, ";", "")
+    ThemePropertiesForStyle = props
+End Function
+
+Private Function CssPropertiesForStyle(ByVal doc As Document, ByVal styleName As String) As String
+    On Error GoTo Fail
+
+    Dim st As Style
+    Set st = doc.Styles(styleName)
+
+    Dim sb As String
+    Dim fontName As String
+    fontName = st.Font.Name
+    If Len(fontName) > 0 Then sb = sb & "  font-family: " & CssString(fontName) & ";" & vbCrLf
+
+    If st.Font.Size > 0 And st.Font.Size < 200 Then sb = sb & "  font-size: " & FormatNumberInvariant(st.Font.Size, 1) & "pt;" & vbCrLf
+    If st.Font.Bold = True Then sb = sb & "  font-weight: 700;" & vbCrLf
+    If st.Font.Italic = True Then sb = sb & "  font-style: italic;" & vbCrLf
+
+    Dim colorValue As String
+    colorValue = WordColorToCss(st.Font.Color)
+    If Len(colorValue) > 0 Then sb = sb & "  color: " & colorValue & ";" & vbCrLf
+
+    Dim alignValue As String
+    alignValue = AlignmentToCss(st.ParagraphFormat.Alignment)
+    If Len(alignValue) > 0 Then sb = sb & "  text-align: " & alignValue & ";" & vbCrLf
+
+    If st.ParagraphFormat.SpaceBefore > 0 And st.ParagraphFormat.SpaceBefore < 200 Then sb = sb & "  margin-top: " & FormatNumberInvariant(st.ParagraphFormat.SpaceBefore, 1) & "pt;" & vbCrLf
+    If st.ParagraphFormat.SpaceAfter >= 0 And st.ParagraphFormat.SpaceAfter < 200 Then sb = sb & "  margin-bottom: " & FormatNumberInvariant(st.ParagraphFormat.SpaceAfter, 1) & "pt;" & vbCrLf
+
+    If Len(sb) = 0 Then sb = "  /* no direct style properties exported */" & vbCrLf
+    CssPropertiesForStyle = sb
+    Exit Function
+
+Fail:
+    CssPropertiesForStyle = "  /* style not accessible in Word object model */" & vbCrLf
+End Function
+
+Private Function BuildCommentsSidecarJson(ByVal doc As Document) As String
+    Dim sb As String
+    sb = "{" & vbCrLf
+    sb = sb & "  ""format"": ""mdpp.office-comments.sidecar.v0""," & vbCrLf
+    sb = sb & "  ""source"": {" & vbCrLf
+    sb = sb & "    ""name"": """ & JsonEscape(doc.Name) & """," & vbCrLf
+    sb = sb & "    ""title"": """ & JsonEscape(DocumentTitle(doc)) & """" & vbCrLf
+    sb = sb & "  }," & vbCrLf
+    sb = sb & "  ""comments"": [" & vbCrLf
+
+    Dim i As Long
+    For i = 1 To doc.Comments.Count
+        Dim c As Comment
+        Set c = doc.Comments(i)
+
+        If i > 1 Then sb = sb & "," & vbCrLf
+        sb = sb & "    {" & vbCrLf
+        sb = sb & "      ""id"": " & CStr(i) & "," & vbCrLf
+        sb = sb & "      ""author"": """ & JsonEscape(c.Author) & """," & vbCrLf
+        sb = sb & "      ""initials"": """ & JsonEscape(c.Initial) & """," & vbCrLf
+        sb = sb & "      ""date"": """ & JsonEscape(Format$(c.Date, "yyyy-mm-dd\Thh:nn:ss")) & """," & vbCrLf
+        sb = sb & "      ""sourceStart"": " & CStr(c.Scope.Start) & "," & vbCrLf
+        sb = sb & "      ""sourceEnd"": " & CStr(c.Scope.End) & "," & vbCrLf
+        sb = sb & "      ""scopeText"": """ & JsonEscape(CleanRangeText(c.Scope.Text)) & """," & vbCrLf
+        sb = sb & "      ""commentText"": """ & JsonEscape(CleanRangeText(c.Range.Text)) & """" & vbCrLf
+        sb = sb & "    }"
+    Next i
+
+    sb = sb & vbCrLf & "  ]" & vbCrLf
+    sb = sb & "}" & vbCrLf
+    BuildCommentsSidecarJson = NormalizeLineEndings(sb)
+End Function
+
+Private Function BuildImportDiagnosticsJson(ByVal doc As Document, ByVal diagnostics As Collection) As String
+    Dim sb As String
+    sb = "{" & vbCrLf
+    sb = sb & "  ""format"": ""mdpp.office-import-diagnostics.v0""," & vbCrLf
+    sb = sb & "  ""source"": """ & JsonEscape(doc.Name) & """," & vbCrLf
+    sb = sb & "  ""diagnostics"": [" & vbCrLf
+
+    Dim i As Long
+    For i = 1 To diagnostics.Count
+        If i > 1 Then sb = sb & "," & vbCrLf
+        sb = sb & "    {" & vbCrLf
+        sb = sb & "      ""severity"": ""warning""," & vbCrLf
+        sb = sb & "      ""code"": ""MDPP0421""," & vbCrLf
+        sb = sb & "      ""message"": """ & JsonEscape(CStr(diagnostics(i))) & """" & vbCrLf
+        sb = sb & "    }"
+    Next i
+
+    sb = sb & vbCrLf & "  ]" & vbCrLf
+    sb = sb & "}" & vbCrLf
+    BuildImportDiagnosticsJson = NormalizeLineEndings(sb)
+End Function
+
+Private Sub ExtractImagesViaFilteredHtml(ByVal doc As Document, ByVal exportRoot As String, ByVal imageFiles As Collection, ByVal diagnostics As Collection)
+    On Error GoTo Fail
+
+    If doc.InlineShapes.Count = 0 Then Exit Sub
+
+    Dim fso As Object
+    Set fso = CreateObject("Scripting.FileSystemObject")
+
+    Dim tempRoot As String
+    tempRoot = fso.BuildPath(Environ$("TEMP"), "mdpp-word-export-" & Format$(Now, "yyyymmdd-hhnnss") & "-" & CStr(Int(Rnd() * 100000)))
+    EnsureFolder fso, tempRoot
+
+    Dim tempDocx As String
+    Dim tempHtml As String
+    tempDocx = fso.BuildPath(tempRoot, "source.docx")
+    tempHtml = fso.BuildPath(tempRoot, "source.html")
+
+    doc.SaveCopyAs tempDocx
+
+    Dim tmpDoc As Document
+    Set tmpDoc = Documents.Open(FileName:=tempDocx, ReadOnly:=True, AddToRecentFiles:=False, Visible:=False)
+    tmpDoc.SaveAs2 FileName:=tempHtml, FileFormat:=wdFormatFilteredHTML, AddToRecentFiles:=False
+    tmpDoc.Close SaveChanges:=False
+
+    Dim filesFolder As String
+    filesFolder = fso.BuildPath(tempRoot, "source_files")
+    If Not fso.FolderExists(filesFolder) Then
+        diagnostics.Add "Word filtered HTML export did not produce an image folder; image references may need manual repair."
+        Exit Sub
+    End If
+
+    Dim arr As Object
+    Set arr = CreateObject("System.Collections.ArrayList")
+
+    Dim fileObj As Object
+    For Each fileObj In fso.GetFolder(filesFolder).Files
+        If IsImageExtension(fso.GetExtensionName(fileObj.Name)) Then arr.Add fileObj.Path
+    Next fileObj
+    arr.Sort
+
+    Dim assetFolder As String
+    assetFolder = fso.BuildPath(exportRoot, "assets")
+
+    Dim i As Long
+    For i = 0 To arr.Count - 1
+        Dim src As String
+        Dim ext As String
+        Dim destName As String
+        Dim dest As String
+
+        src = CStr(arr(i))
+        ext = LCase$(fso.GetExtensionName(src))
+        If Len(ext) = 0 Then ext = "png"
+        destName = "image-" & Format$(i + 1, "000") & "." & ext
+        dest = fso.BuildPath(assetFolder, destName)
+        fso.CopyFile src, dest, True
+        imageFiles.Add destName
+    Next i
+
+    If imageFiles.Count < doc.InlineShapes.Count Then
+        diagnostics.Add "Fewer image files were extracted than inline shapes found in the document; some image references may need manual repair."
+    End If
+
+    On Error Resume Next
+    fso.DeleteFolder tempRoot, True
+    On Error GoTo 0
+    Exit Sub
+
+Fail:
+    diagnostics.Add "Image extraction failed: " & Err.Description
+End Sub
+
+Private Function IsImageExtension(ByVal ext As String) As Boolean
+    ext = LCase$(ext)
+    Select Case ext
+        Case "png", "jpg", "jpeg", "gif", "bmp", "tif", "tiff", "svg", "emf", "wmf"
+            IsImageExtension = True
+        Case Else
+            IsImageExtension = False
+    End Select
+End Function
+
+Private Function DocumentTitle(ByVal doc As Document) As String
+    On Error GoTo Fallback
+
+    Dim t As String
+    t = Trim$(CStr(doc.BuiltInDocumentProperties("Title")))
+    If Len(t) = 0 Then t = BaseNameWithoutExtension(doc.Name)
+    DocumentTitle = t
+    Exit Function
+
+Fallback:
+    DocumentTitle = BaseNameWithoutExtension(doc.Name)
+End Function
+
+Private Function BaseNameWithoutExtension(ByVal fileName As String) As String
+    Dim p As Long
+    p = InStrRev(fileName, ".")
+    If p > 1 Then
+        BaseNameWithoutExtension = Left$(fileName, p - 1)
+    Else
+        BaseNameWithoutExtension = fileName
+    End If
+End Function
+
+Private Function DefaultBodyFont(ByVal doc As Document) As String
+    DefaultBodyFont = StyleFontName(doc, "Normal", "Calibri")
+End Function
+
+Private Function StyleFontName(ByVal doc As Document, ByVal styleName As String, ByVal fallback As String) As String
+    On Error GoTo Fail
+    Dim v As String
+    v = doc.Styles(styleName).Font.Name
+    If Len(v) = 0 Then v = fallback
+    StyleFontName = v
+    Exit Function
+Fail:
+    StyleFontName = fallback
+End Function
+
+Private Function PaperSizeText(ByVal ps As PageSetup) As String
+    On Error Resume Next
+
+    Select Case ps.PaperSize
+        Case wdPaperA4
+            PaperSizeText = "A4"
+        Case wdPaperLetter
+            PaperSizeText = "Letter"
+        Case Else
+            PaperSizeText = "custom(" & PointsToMmText(ps.PageWidth) & "," & PointsToMmText(ps.PageHeight) & ")"
+    End Select
+End Function
+
+Private Function PointsToMmText(ByVal pointsValue As Double) As String
+    PointsToMmText = FormatNumberInvariant(pointsValue * 25.4 / 72#, 1) & "mm"
+End Function
+
+Private Function FormatNumberInvariant(ByVal value As Double, ByVal digits As Long) As String
+    Dim s As String
+    s = Format$(value, "0" & IIf(digits > 0, "." & String$(digits, "0"), ""))
+    FormatNumberInvariant = Replace(s, Application.International(wdDecimalSeparator), ".")
+End Function
+
+Private Function WordColorToCss(ByVal colorValue As Long) As String
+    On Error GoTo Fail
+
+    If colorValue = wdColorAutomatic Or colorValue < 0 Then
+        WordColorToCss = ""
+        Exit Function
+    End If
+
+    Dim r As Long, g As Long, b As Long
+    r = colorValue Mod 256
+    g = (colorValue \ 256) Mod 256
+    b = (colorValue \ 65536) Mod 256
+
+    WordColorToCss = "#" & Right$("0" & Hex$(r), 2) & Right$("0" & Hex$(g), 2) & Right$("0" & Hex$(b), 2)
+    Exit Function
+
+Fail:
+    WordColorToCss = ""
+End Function
+
+Private Function AlignmentToCss(ByVal alignmentValue As Long) As String
+    Select Case alignmentValue
+        Case wdAlignParagraphCenter
+            AlignmentToCss = "center"
+        Case wdAlignParagraphRight
+            AlignmentToCss = "right"
+        Case wdAlignParagraphJustify, wdAlignParagraphJustifyHi, wdAlignParagraphJustifyLow, wdAlignParagraphJustifyMed
+            AlignmentToCss = "justify"
+        Case wdAlignParagraphLeft
+            AlignmentToCss = "left"
+        Case Else
+            AlignmentToCss = ""
+    End Select
+End Function
+
+Private Function CleanHeaderFooterText(ByVal rng As Range) As String
+    CleanHeaderFooterText = SingleLine(CleanRangeText(rng.Text))
+End Function
+
+Private Function CleanRangeText(ByVal textValue As String) As String
+    Dim s As String
+    s = textValue
+    s = Replace(s, Chr$(13), vbLf)
+    s = Replace(s, Chr$(7), "")
+    s = Replace(s, Chr$(11), vbLf)
+    s = Replace(s, vbTab, " ")
+    s = Trim$(s)
+    CleanRangeText = s
+End Function
+
+Private Function SingleLine(ByVal textValue As String) As String
+    Dim s As String
+    s = Replace(textValue, vbCrLf, " ")
+    s = Replace(s, vbCr, " ")
+    s = Replace(s, vbLf, " ")
+    Do While InStr(s, "  ") > 0
+        s = Replace(s, "  ", " ")
+    Loop
+    SingleLine = Trim$(s)
+End Function
+
+Private Sub StripRangeEndMarks(ByVal rng As Range)
+    On Error Resume Next
+    Do While rng.End > rng.Start
+        Dim lastChar As String
+        lastChar = rng.Document.Range(rng.End - 1, rng.End).Text
+        If lastChar = Chr$(13) Or lastChar = Chr$(7) Or lastChar = Chr$(11) Then
+            rng.End = rng.End - 1
+        Else
+            Exit Do
+        End If
+    Loop
+End Sub
+
+Private Function MarkdownEscapeInline(ByVal textValue As String) As String
+    Dim s As String
+    s = textValue
+    s = Replace(s, "\", "\\")
+    s = Replace(s, "`", "\`")
+    s = Replace(s, "*", "\*")
+    s = Replace(s, "_", "\_")
+    s = Replace(s, "[", "\[")
+    s = Replace(s, "]", "\]")
+    MarkdownEscapeInline = s
+End Function
+
+Private Function MarkdownTableCell(ByVal textValue As String) As String
+    Dim s As String
+    s = textValue
+    s = Replace(s, vbCrLf, "<br>")
+    s = Replace(s, vbCr, "<br>")
+    s = Replace(s, vbLf, "<br>")
+    s = Replace(s, "|", "\|")
+    MarkdownTableCell = s
+End Function
+
+Private Function MarkdownEscapeUrl(ByVal textValue As String) As String
+    Dim s As String
+    s = textValue
+    s = Replace(s, " ", "%20")
+    s = Replace(s, ")", "%29")
+    MarkdownEscapeUrl = s
+End Function
+
+Private Function MdDirectiveText(ByVal textValue As String) As String
+    Dim s As String
+    s = Replace(textValue, "<", "")
+    s = Replace(s, ">", "")
+    s = Replace(s, vbCr, " ")
+    s = Replace(s, vbLf, " ")
+    MdDirectiveText = Trim$(s)
+End Function
+
+Private Function ThemeValue(ByVal textValue As String) As String
+    Dim s As String
+    s = SingleLine(textValue)
+    s = Replace(s, "{", "\{")
+    s = Replace(s, "}", "\}")
+    ThemeValue = s
+End Function
+
+Private Function CssString(ByVal textValue As String) As String
+    Dim s As String
+    s = Replace(textValue, "\", "\\")
+    s = Replace(s, """", "\""")
+    CssString = """" & s & """"
+End Function
+
+Private Function CssIdentifier(ByVal textValue As String) As String
+    CssIdentifier = Replace(textValue, ".", "\.")
+End Function
+
+Private Function JsonEscape(ByVal textValue As String) As String
+    Dim s As String
+    s = textValue
+    s = Replace(s, "\", "\\")
+    s = Replace(s, """", "\""")
+    s = Replace(s, vbCrLf, "\n")
+    s = Replace(s, vbCr, "\n")
+    s = Replace(s, vbLf, "\n")
+    s = Replace(s, vbTab, "\t")
+    JsonEscape = s
+End Function
+
+Private Function HtmlCommentSafe(ByVal textValue As String) As String
+    HtmlCommentSafe = Replace(textValue, "--", "- -")
+End Function
+
+Private Function Slugify(ByVal textValue As String) As String
+    Dim s As String
+    s = LCase$(Trim$(textValue))
+
+    Dim i As Long
+    Dim out As String
+    For i = 1 To Len(s)
+        Dim ch As String
+        ch = Mid$(s, i, 1)
+        If (ch >= "a" And ch <= "z") Or (ch >= "0" And ch <= "9") Then
+            out = out & ch
+        ElseIf ch = " " Or ch = "_" Or ch = "-" Or ch = "." Or ch = "/" Or ch = "\" Or ch = ":" Then
+            If Len(out) > 0 And Right$(out, 1) <> "-" Then out = out & "-"
+        End If
+    Next i
+
+    Do While Right$(out, 1) = "-"
+        out = Left$(out, Len(out) - 1)
+    Loop
+
+    If Len(out) = 0 Then out = "style"
+    Slugify = out
+End Function
+
+Private Function SortedDictionaryKeys(ByVal dict As Object) As Variant
+    Dim arr As Object
+    Set arr = CreateObject("System.Collections.ArrayList")
+
+    Dim k As Variant
+    For Each k In dict.Keys
+        arr.Add CStr(k)
+    Next k
+    arr.Sort
+
+    If arr.Count = 0 Then
+        Dim emptyArr(0 To 0) As String
+        emptyArr(0) = "Normal"
+        SortedDictionaryKeys = emptyArr
+        Exit Function
+    End If
+
+    Dim result() As String
+    ReDim result(0 To arr.Count - 1)
+
+    Dim i As Long
+    For i = 0 To arr.Count - 1
+        result(i) = CStr(arr(i))
+    Next i
+
+    SortedDictionaryKeys = result
+End Function
+
+Private Function NormalizeLineEndings(ByVal textValue As String) As String
+    Dim s As String
+    s = Replace(textValue, vbCrLf, vbLf)
+    s = Replace(s, vbCr, vbLf)
+    s = Replace(s, vbLf, vbCrLf)
+    NormalizeLineEndings = s
+End Function
+
+Private Sub EnsureFolder(ByVal fso As Object, ByVal folderPath As String)
+    If Len(folderPath) = 0 Then Exit Sub
+    If Not fso.FolderExists(folderPath) Then fso.CreateFolder folderPath
+End Sub
+
+Private Sub WriteUtf8(ByVal filePath As String, ByVal content As String)
+    Dim stream As Object
+    Set stream = CreateObject("ADODB.Stream")
+    stream.Type = 2
+    stream.Charset = "utf-8"
+    stream.Open
+    stream.WriteText content
+    stream.SaveToFile filePath, 2
+    stream.Close
+End Sub

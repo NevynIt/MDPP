@@ -1,0 +1,77 @@
+/* md++ Word import base stylesheet template.
+   The VBA exporter writes a generated version of this stylesheet with extra
+   .word-style-* classes derived from the source document. */
+
+.mdpp-document {
+  box-sizing: border-box;
+  color: var(--md-colors-text, #222);
+  background: var(--md-colors-background, #fff);
+  font-family: var(--md-fonts-body, Calibri, Arial, sans-serif);
+  line-height: 1.35;
+}
+
+.mdpp-document *,
+.mdpp-document *::before,
+.mdpp-document *::after {
+  box-sizing: inherit;
+}
+
+.mdpp-heading {
+  font-family: var(--md-fonts-heading, var(--md-fonts-body, Calibri, Arial, sans-serif));
+  line-height: 1.2;
+  margin: 1.2em 0 0.4em;
+}
+
+.mdpp-paragraph {
+  margin: 0 0 0.75em;
+}
+
+.mdpp-list {
+  margin: 0 0 0.75em 1.5em;
+  padding-left: 1.2em;
+}
+
+.mdpp-blockquote {
+  border-left: 4px solid var(--md-colors-border, #d0d7de);
+  margin: 1em 0;
+  padding-left: 1em;
+  color: var(--md-colors-muted, #667085);
+}
+
+.mdpp-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+}
+
+.mdpp-table th,
+.mdpp-table td,
+.mdpp-document table th,
+.mdpp-document table td {
+  border: 1px solid var(--md-colors-border, #d0d7de);
+  padding: 6px 8px;
+  vertical-align: top;
+}
+
+.mdpp-table th,
+.mdpp-document table th {
+  background: #f6f8fa;
+  font-weight: 700;
+}
+
+.word-image,
+.mdpp-image {
+  max-width: 100%;
+  height: auto;
+}
+
+.mdpp-page {
+  position: relative;
+  background: var(--md-colors-background, #fff);
+}
+
+.mdpp-page-header,
+.mdpp-page-footer {
+  font-size: 0.85em;
+  color: var(--md-colors-muted, #667085);
+}
