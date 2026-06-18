@@ -15,6 +15,10 @@ accent: #2f5597
 body-font: Calibri, Arial, sans-serif
 heading-font: Calibri, Arial, sans-serif
 
+## class callout-warning
+
+css-class: .callout-warning
+
 ## class word-style-caption
 
 css-class: .word-style-caption
@@ -23,37 +27,13 @@ css-class: .word-style-caption
 
 css-class: .word-style-executive-summary
 
-## class word-style-heading-1
-
-css-class: .word-style-heading-1
-
-## class word-style-list-bullet
-
-css-class: .word-style-list-bullet
-
-## class word-style-list-bullet-2
-
-css-class: .word-style-list-bullet-2
-
-## class word-style-list-number
-
-css-class: .word-style-list-number
-
 ## class word-style-mdpp-callout-warning
 
 css-class: .word-style-mdpp-callout-warning
 
-## class word-style-mdpp-code-block
-
-css-class: .word-style-mdpp-code-block
-
 ## class word-style-mdpp-lead
 
 css-class: .word-style-mdpp-lead
-
-## class word-style-quote
-
-css-class: .word-style-quote
 
 ## class word-style-spec-note
 

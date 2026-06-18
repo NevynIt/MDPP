@@ -11,59 +11,51 @@ A DOCX test document for Word-to-md++ exporters {.word-style-mdpp-lead}
 
 Purpose: explain the md++ language profile while exercising clean mappings, lossy mappings, sidecar metadata, and unsupported Office features. {.word-style-spec-note}
 
-# Fixture map {.word-style-heading-1}
+# Fixture map
 
 This file is intentionally both documentation and a test fixture. The exporter should produce readable md++ plus diagnostics where fidelity cannot be preserved. {.word-style-mdpp-lead}
 
-Spec overview and expected md++ directives {.word-style-list-bullet}
+- Spec overview and expected md++ directives
 
-Word styles mapped to md++ classes {.word-style-list-bullet}
+- Word styles mapped to md++ classes
 
-Markdown-compatible body features {.word-style-list-bullet}
+- Markdown-compatible body features
 
-Simple and complex tables {.word-style-list-bullet}
+- Simple and complex tables
 
-Images, captions, links, bookmarks, and assets {.word-style-list-bullet}
+- Images, captions, links, bookmarks, and assets
 
-Headers, footers, page numbers, sections, and layout {.word-style-list-bullet}
+- Headers, footers, page numbers, sections, and layout
 
-Comments, review metadata, and unsupported objects {.word-style-list-bullet}
+- Comments, review metadata, and unsupported objects
 
-Exporter acceptance checklist {.word-style-list-bullet}
+- Exporter acceptance checklist
 
-# 1. md++ spec overview {.word-style-heading-1}
+# 1. md++ spec overview
 
 md++ keeps ordinary Markdown as the host language and adds directives, resources, capabilities, layouts, models, plugins, and output conventions. A plain Markdown renderer should still show useful content; a full md++ processor adds interpretation.
 
 A Word style named Executive Summary should export as an author-facing class, for example {.word-style-executive-summary}, not as a hidden Word-only object. {.word-style-executive-summary}
 
-<span id="word-comment-0" class="word-comment-anchor"></span>COMMENT\_TARGET\_STYLE\_CLASS: This warning callout tests a named paragraph style that should map to {.callout-warning}. Unknown classes should remain in the Markdown source. {.word-style-mdpp-callout-warning}
+COMMENT\_TARGET\_STYLE\_CLASS: This warning callout tests a named paragraph style that should map to {.callout-warning}. Unknown classes should remain in the Markdown source. {#word-comment-0 .callout-warning .word-style-mdpp-callout-warning}
 
 Representative md++ document directives:
 
-\[md:profile\]: md++ {.word-style-mdpp-code-block}
+```
+[md:profile]: md++
+[md:profile-version]: 0.14
+[md:title]: <md++ Word Export Fixture>
+[md:status]: draft
+[md:require]: include
+[md:require]: layout.grid
+[md:require]: diagram.mermaid
+[md:require]: model.dot
+[md:theme]: ./themes/company.theme.md
+[md:layout]: ./layouts/report.layout.md
+[md:stylesheet]: ./styles/local-overrides.css
+```
 
-\[md:profile-version\]: 0.14 {.word-style-mdpp-code-block}
-
-\[md:title\]: <md++ Word Export Fixture> {.word-style-mdpp-code-block}
-
-\[md:status\]: draft {.word-style-mdpp-code-block}
-
-\[md:require\]: include {.word-style-mdpp-code-block}
-
-\[md:require\]: layout.grid {.word-style-mdpp-code-block}
-
-\[md:require\]: diagram.mermaid {.word-style-mdpp-code-block}
-
-\[md:require\]: model.dot {.word-style-mdpp-code-block}
-
-\[md:theme\]: ./themes/company.theme.md {.word-style-mdpp-code-block}
-
-\[md:layout\]: ./layouts/report.layout.md {.word-style-mdpp-code-block}
-
-\[md:stylesheet\]: ./styles/local-overrides.css {.word-style-mdpp-code-block}
-
-# 2. Word-to-md++ mapping matrix {.word-style-heading-1}
+# 2. Word-to-md++ mapping matrix
 
 | \*\*Word source feature\*\* | \*\*Expected md++ target\*\* | \*\*Exporter assertion\*\* | \*\*Diagnostic expectation\*\* |
 | --- | --- | --- | --- |
@@ -78,37 +70,31 @@ Representative md++ document directives:
 | Comments | sidecar YAML/JSON | Anchor comments to block id/range | MDPP0700-range for degraded anchors |
 | Freeform text box/shape | asset, placeholder, omission, or diagnostic | Do not treat as normal body flow | MDPP0700-range |
 
-# 3. Markdown-compatible body features {.word-style-heading-1}
+# 3. Markdown-compatible body features
 
 Inline formatting: **strong text**, *emphasized text*, inline code model=system-graph, and an external link to [a placeholder exporter URL](https://example.org/mdpp-exporter-test).
 
 Nested list test:
 
-First bullet should remain an unordered Markdown item. {.word-style-list-bullet}
+- First bullet should remain an unordered Markdown item.
 
-Nested bullets should preserve indentation. {.word-style-list-bullet-2}
+  - Nested bullets should preserve indentation.
 
-Numbered sequence should become an ordered Markdown list. {.word-style-list-number}
+1. Numbered sequence should become an ordered Markdown list.
 
-Second ordered item checks numbering continuity. {.word-style-list-number}
+1. Second ordered item checks numbering continuity.
 
-Block quote test: md++ should preserve ordinary Markdown block quote semantics before applying theme or layout interpretation. {.word-style-quote}
+> Block quote test: md++ should preserve ordinary Markdown block quote semantics before applying theme or layout interpretation.
 
 Fenced code block test:
 
-\`\`\`typescript {.word-style-mdpp-code-block}
-
-interface MdExportResult { {.word-style-mdpp-code-block}
-
-markdown: string; {.word-style-mdpp-code-block}
-
-diagnostics: MdDiagnostic\[\]; {.word-style-mdpp-code-block}
-
-sidecars: MdSidecar\[\]; {.word-style-mdpp-code-block}
-
-} {.word-style-mdpp-code-block}
-
-\`\`\` {.word-style-mdpp-code-block}
+```typescript
+interface MdExportResult {
+markdown: string;
+diagnostics: MdDiagnostic[];
+sidecars: MdSidecar[];
+}
+```
 
 Inline math target: $E = mc^2$ should remain Markdown-compatible text if no equation converter is available.
 
@@ -116,7 +102,7 @@ Word equation object: E = mc²
 
 Exporter note: if Word equation OMML can be converted to LaTeX, emit md++ math. Otherwise emit source text, placeholder, or a diagnostic. {.word-style-spec-note}
 
-# 4. Tables {.word-style-heading-1}
+# 4. Tables
 
 Simple table expected to export as a GFM table:
 
@@ -127,15 +113,15 @@ Simple table expected to export as a GFM table:
 | ### Left {.left} | Area binding | heading with class |
 | !\\\[alt\\\](asset.png) | Image asset | Markdown image |
 
-<span id="word-comment-1" class="word-comment-anchor"></span>COMMENT\_TARGET\_TABLE: The next table deliberately uses merged cells and nested-looking content. It should not be forced into a plain GFM table if structure would be lost. {.word-style-mdpp-callout-warning}
+COMMENT\_TARGET\_TABLE: The next table deliberately uses merged cells and nested-looking content. It should not be forced into a plain GFM table if structure would be lost. {#word-comment-1 .callout-warning .word-style-mdpp-callout-warning}
 
 | \*\*Complex Word table: merged title row plus mixed content\*\* |  |  |  |
 | --- | --- | --- | --- |
-| Vertical group<br>(merged cells) | \*\*Case\*\* | \*\*Expected md++ target\*\* | \*\*Reason\*\* |
+| Vertical group / (merged cells) | \*\*Case\*\* | \*\*Expected md++ target\*\* | \*\*Reason\*\* |
 |  | nested list-like content | component block | GFM cannot preserve merged geometry |
 |  | manual line breaks | fallback HTML or diagnostic | structure is richer than simple Markdown |
 
-# 5. Images, captions, links, and anchors {.word-style-heading-1}
+# 5. Images, captions, links, and anchors
 
 Image test: exporter should extract this PNG as an asset, preserve alt text, and keep the caption nearby.
 
@@ -145,25 +131,23 @@ Figure 1. md++ Word-to-md++ asset pipeline; expected Markdown image with alt tex
 
 Internal anchor test: this sentence refers to Figure 1 by a named bookmark. Exporters may convert bookmarks to explicit anchors such as {#fig-mdpp-pipeline}.
 
-# 6. Page furniture and layout {.word-style-heading-1}
+# 6. Page furniture and layout
 
 This document has a different first-page header, a running header, and a footer with PAGE and NUMPAGES fields. The md++ target should prefer theme page-furniture definitions instead of duplicating repeated header/footer text in body flow.
 
-## page-furniture report {.word-style-mdpp-code-block}
-
-header-left: {document.title} {.word-style-mdpp-code-block}
-
-header-right: {page.number} {.word-style-mdpp-code-block}
-
-footer-center: Confidential fixture {.word-style-mdpp-code-block}
-
-number-format: {page.number} / {page.count} {.word-style-mdpp-code-block}
+```
+## page-furniture report
+header-left: {document.title}
+header-right: {page.number}
+footer-center: Confidential fixture
+number-format: {page.number} / {page.count}
+```
 
 Section and page-break test: the next page is landscape to test layout/page model normalization. A simple exporter may emit a layout resource, a page attribute, or a diagnostic if it cannot preserve orientation. {.word-style-spec-note}
 
 ---
 
-# 7. Landscape layout and unsupported Office objects {.word-style-heading-1}
+# 7. Landscape layout and unsupported Office objects
 
 This landscape section checks page geometry, section breaks, freeform objects, and degraded visual constructs. {.word-style-mdpp-lead}
 
@@ -176,13 +160,13 @@ The table above is content that explains layout resources. It is not a Word layo
 
 Unsupported freeform layout object below:
 
-<span id="word-comment-2" class="word-comment-anchor"></span>COMMENT\_TARGET\_UNSUPPORTED: The text box above is an unsupported freeform object test. Exporter should emit a static asset, placeholder, omission, or MDPP0700-range diagnostic. {.word-style-mdpp-callout-warning}
+COMMENT\_TARGET\_UNSUPPORTED: The text box above is an unsupported freeform object test. Exporter should emit a static asset, placeholder, omission, or MDPP0700-range diagnostic. {#word-comment-2 .callout-warning .word-style-mdpp-callout-warning}
 
 ![Chart-like image used to explain degraded import expectations](assets/image-002.png){.word-image width="374pt" height="162pt" data-word-layout="inline"}
 
 Figure 2. Chart-like visual: native Word charts should degrade to asset, placeholder, or diagnostic; this fixture includes a static image analogue. {.word-style-caption}
 
-# 8. Comments and review metadata {.word-style-heading-1}
+# 8. Comments and review metadata
 
 This section includes real Word comments added after document creation. The expected md++ export is a sidecar file such as root.md.comments.yaml, with anchors to headings, paragraphs, or generated block identifiers.
 
@@ -190,7 +174,7 @@ Tracked change seed sentence: This sentence intentionally contains the phrase tr
 
 If tracked changes are unsupported by the exporter, emit review metadata to a sidecar or produce a diagnostic rather than silently accepting or discarding the change. {.word-style-spec-note}
 
-# 9. Exporter acceptance checklist {.word-style-heading-1}
+# 9. Exporter acceptance checklist
 
 | \*\*Check\*\* | \*\*Expected result\*\* | \*\*Pass criterion\*\* |
 | --- | --- | --- |

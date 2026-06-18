@@ -30,6 +30,10 @@
 .mdpp-document .word-comment-anchor {
   display: inline;
 }
+.mdpp-document .callout-warning {
+  /* Word style class imported from DOCX. Refine in the theme/CSS layer. */
+}
+
 .mdpp-document .word-style-caption {
   /* Word style class imported from DOCX. Refine in the theme/CSS layer. */
 }
@@ -38,35 +42,11 @@
   /* Word style class imported from DOCX. Refine in the theme/CSS layer. */
 }
 
-.mdpp-document .word-style-heading-1 {
-  /* Word style class imported from DOCX. Refine in the theme/CSS layer. */
-}
-
-.mdpp-document .word-style-list-bullet {
-  /* Word style class imported from DOCX. Refine in the theme/CSS layer. */
-}
-
-.mdpp-document .word-style-list-bullet-2 {
-  /* Word style class imported from DOCX. Refine in the theme/CSS layer. */
-}
-
-.mdpp-document .word-style-list-number {
-  /* Word style class imported from DOCX. Refine in the theme/CSS layer. */
-}
-
 .mdpp-document .word-style-mdpp-callout-warning {
   /* Word style class imported from DOCX. Refine in the theme/CSS layer. */
 }
 
-.mdpp-document .word-style-mdpp-code-block {
-  /* Word style class imported from DOCX. Refine in the theme/CSS layer. */
-}
-
 .mdpp-document .word-style-mdpp-lead {
-  /* Word style class imported from DOCX. Refine in the theme/CSS layer. */
-}
-
-.mdpp-document .word-style-quote {
   /* Word style class imported from DOCX. Refine in the theme/CSS layer. */
 }
 
