@@ -146,7 +146,7 @@ export async function convertDocxToMdpp(input: MdppDocxConvertInput, options: Md
 
   state.files.push({ path: state.options.rootFileName, content: lines.join("\n").replace(/\n{3,}/g, "\n\n"), mediaType: "text/markdown" });
   state.files.push({ path: "themes/word-import.theme.md", content: buildTheme(state, documentXml), mediaType: "text/markdown" });
-  state.files.push({ path: "layouts/word-report.layout.md", content: buildLayout(documentXml), mediaType: "text/markdown" });
+  state.files.push({ path: "layouts/word-report.layout.md", content: buildLayout(state, documentXml), mediaType: "text/markdown" });
   state.files.push({ path: "styles/word-import.css", content: buildCss(state), mediaType: "text/css" });
   state.files.push({ path: "comments/comments.sidecar.json", content: JSON.stringify(buildCommentsSidecar(state), null, 2) + "\n", mediaType: "application/json" });
   state.files.push({ path: "comments/import-diagnostics.json", content: JSON.stringify(state.diagnostics, null, 2) + "\n", mediaType: "application/json" });
@@ -157,10 +157,11 @@ export async function convertDocxToMdpp(input: MdppDocxConvertInput, options: Md
 function paragraphToMarkdown(p: Element, state: ConversionState, paragraphIndex: number): string {
   const info = paragraphInfo(p, state);
   const anchorIds = commentAnchorIdsForParagraph(p, state, paragraphIndex);
+  const bookmarkIds = bookmarkIdsForParagraph(p);
   const text = inlineContent(p, state).trim();
-  if (!text && !anchorIds.length) return "";
+  if (!text && !anchorIds.length && !bookmarkIds.length) return "";
 
-  const attrs = blockAttributes(info, anchorIds, state);
+  const attrs = blockAttributes(info, [...bookmarkIds, ...anchorIds], state);
   switch (info.semantic.kind) {
     case "heading":
       return `${"#".repeat(info.semantic.level)} ${text}${attrs ? " " + attrs : ""}`.trim();
@@ -217,6 +218,15 @@ function commentAnchorIdsForParagraph(p: Element, state: ConversionState, paragr
     if (state.options.commentAnchorMode === "attribute") anchorIds.push(anchorId);
   }
   return anchorIds;
+}
+
+function bookmarkIdsForParagraph(p: Element): string[] {
+  const ids: string[] = [];
+  for (const el of children(p, "bookmarkStart")) {
+    const name = attr(el, "name");
+    if (name && !name.startsWith("_")) ids.push(name);
+  }
+  return ids;
 }
 
 function blockAttributes(info: ParagraphInfo, anchorIds: string[], state: ConversionState): string {
@@ -280,6 +290,29 @@ function inlineContent(parent: Element, state: ConversionState): string {
       case "hyperlink":
         out += hyperlinkToMarkdown(node, state);
         break;
+      case "oMath":
+      case "oMathPara":
+        out += escapeMarkdownText(textOf(node));
+        break;
+      case "ins":
+        state.diagnostics.push({
+          code: "MDPP0416",
+          severity: "warning",
+          message: "Tracked insertion was accepted into the Markdown output.",
+          wordPart: "word/document.xml",
+          detail: { text: textOf(node).trim() }
+        });
+        out += inlineContent(node, state);
+        break;
+      case "del":
+        state.diagnostics.push({
+          code: "MDPP0416",
+          severity: "warning",
+          message: "Tracked deletion was omitted from the Markdown output.",
+          wordPart: "word/document.xml",
+          detail: { text: textOf(node).trim() }
+        });
+        break;
       case "bookmarkStart":
       case "bookmarkEnd":
       case "commentRangeStart":
@@ -299,10 +332,11 @@ function inlineContent(parent: Element, state: ConversionState): string {
 
 function runToMarkdown(r: Element, state: ConversionState): string {
   let out = "";
+  const code = runHasStyle(r, /code/i);
   for (const node of children(r)) {
     switch (localName(node)) {
       case "t":
-        out += escapeMarkdownText(textOf(node));
+        out += code ? escapeCodeSpanText(textOf(node)) : escapeMarkdownText(textOf(node));
         break;
       case "tab":
         out += "\t";
@@ -323,11 +357,22 @@ function runToMarkdown(r: Element, state: ConversionState): string {
   const bold = runHasProperty(r, "b");
   const italic = runHasProperty(r, "i");
   if (out.trim()) {
-    if (bold && italic) out = `***${out}***`;
+    if (code) out = `\`${out}\``;
+    else if (bold && italic) out = `***${out}***`;
     else if (bold) out = `**${out}**`;
     else if (italic) out = `*${out}*`;
   }
   return out;
+}
+
+function runHasStyle(r: Element, pattern: RegExp): boolean {
+  const rPr = firstChild(r, "rPr");
+  const styleId = attr(firstChild(rPr, "rStyle"), "val");
+  return !!styleId && pattern.test(styleId);
+}
+
+function escapeCodeSpanText(text: string): string {
+  return text.replace(/`/g, "\\`");
 }
 
 function hyperlinkToMarkdown(h: Element, state: ConversionState): string {
@@ -393,13 +438,22 @@ function drawingToMarkdown(drawing: Element, state: ConversionState): string {
 }
 
 function tableToMarkdown(tbl: Element, state: ConversionState): string {
-  const rows = children(tbl, "tr");
-  const matrix = rows.map(row => children(row, "tc").map(cell => cellText(cell, state)));
+  const normalized = normalizeTable(tbl, state);
+  const matrix = normalized.matrix;
   const maxCols = Math.max(0, ...matrix.map(r => r.length));
+  if (normalized.hasMergedCells) {
+    state.diagnostics.push({
+      code: "MDPP0417",
+      severity: "warning",
+      message: "Merged Word table cells were normalized to Markdown table rows; exact merge geometry was not preserved.",
+      wordPart: "word/document.xml"
+    });
+  }
   if (!state.options.emitSimpleMarkdownTables || maxCols === 0) {
     state.diagnostics.push({ code: "MDPP0417", severity: "warning", message: "Table could not be represented as a Markdown table and was emitted as plain text rows.", wordPart: "word/document.xml" });
     return matrix.map(row => row.filter(Boolean).join(" | ")).filter(Boolean).join("\n");
   }
+  const title = normalized.title ? `${normalized.title}\n\n` : "";
   const padded = matrix.map(r => [...r, ...Array(Math.max(0, maxCols - r.length)).fill("")]);
   const header = padded[0] || Array(maxCols).fill("");
   const lines = [
@@ -407,13 +461,51 @@ function tableToMarkdown(tbl: Element, state: ConversionState): string {
     `| ${Array(maxCols).fill("---").join(" | ")} |`
   ];
   for (const row of padded.slice(1)) lines.push(`| ${row.map(escapeMarkdownCell).join(" | ")} |`);
-  return lines.join("\n");
+  return title + lines.join("\n");
+}
+
+function normalizeTable(tbl: Element, state: ConversionState): { matrix: string[][]; hasMergedCells: boolean; title?: string } {
+  const rows = children(tbl, "tr");
+  const matrix: string[][] = [];
+  const verticalMergeValues = new Map<number, string>();
+  let hasMergedCells = false;
+  let title: string | undefined;
+
+  for (const row of rows) {
+    const outRow: string[] = [];
+    let col = 0;
+    for (const cell of children(row, "tc")) {
+      const tcPr = firstChild(cell, "tcPr");
+      const gridSpan = Number(attr(firstChild(tcPr, "gridSpan"), "val") ?? 1);
+      const vMerge = firstChild(tcPr, "vMerge");
+      const vMergeValue = attr(vMerge, "val");
+      if (gridSpan > 1 || vMerge) hasMergedCells = true;
+
+      let text = cellText(cell, state);
+      if (vMerge && vMergeValue !== "restart") {
+        text = verticalMergeValues.get(col) ?? text;
+      } else if (vMergeValue === "restart") {
+        verticalMergeValues.set(col, text);
+      }
+
+      outRow.push(text);
+      for (let i = 1; i < gridSpan; i++) outRow.push("");
+      col += Math.max(1, gridSpan);
+    }
+    matrix.push(outRow);
+  }
+
+  if (matrix.length > 1 && matrix[0].length > 1 && matrix[0][0] && matrix[0].slice(1).every(cell => !cell)) {
+    title = matrix.shift()![0];
+  }
+
+  return { matrix, hasMergedCells, title };
 }
 
 function cellText(cell: Element, state: ConversionState): string {
   return children(cell)
     .filter(c => localName(c) === "p")
-    .map((p, i) => paragraphToMarkdown(p, state, -1 - i).replace(/\s*\{\.word-style-[^}]+\}\s*$/, ""))
+    .map(p => inlineContent(p, state).trim())
     .filter(Boolean)
     .join("\n");
 }
@@ -460,12 +552,28 @@ function buildTheme(state: ConversionState, documentXml: Document): string {
   return lines.join("\n");
 }
 
-function buildLayout(documentXml: Document): string {
-  const sect = sectionProperties(documentXml);
+function buildLayout(state: ConversionState, documentXml: Document): string {
+  const sections = descendants(documentXml, "sectPr");
+  const sect = sections[0] ?? sectionProperties(documentXml);
   const pgSz = sect ? firstChild(sect, "pgSz") : undefined;
   const w = Number(attr(pgSz, "w"));
   const h = Number(attr(pgSz, "h"));
   const orientation = attr(pgSz, "orient") || (Number.isFinite(w) && Number.isFinite(h) && w > h ? "landscape" : "portrait");
+  const orientations = new Set(sections.map(section => {
+    const size = firstChild(section, "pgSz");
+    const sw = Number(attr(size, "w"));
+    const sh = Number(attr(size, "h"));
+    return attr(size, "orient") || (Number.isFinite(sw) && Number.isFinite(sh) && sw > sh ? "landscape" : "portrait");
+  }));
+  if (orientations.size > 1) {
+    state.diagnostics.push({
+      code: "MDPP0418",
+      severity: "warning",
+      message: "Multiple Word section orientations were normalized to a single md++ layout orientation.",
+      wordPart: "word/document.xml",
+      detail: { orientations: [...orientations] }
+    });
+  }
   return [
     "[md:profile]: md++",
     "[md:profile-version]: 0.14",
@@ -540,10 +648,8 @@ function buildCommentsSidecar(state: ConversionState) {
 }
 
 function extractPageFurniture(state: ConversionState, documentXml: Document): Record<string, string> {
-  const sect = sectionProperties(documentXml);
-  if (!sect) return {};
   const result: Record<string, string> = {};
-  const refs = children(sect).filter(e => localName(e) === "headerReference" || localName(e) === "footerReference");
+  const refs = descendants(documentXml, "sectPr").flatMap(sect => children(sect).filter(e => localName(e) === "headerReference" || localName(e) === "footerReference"));
   for (const ref of refs) {
     const id = attr(ref, "id");
     if (!id) continue;
@@ -553,12 +659,24 @@ function extractPageFurniture(state: ConversionState, documentXml: Document): Re
     const xmlText = state.packageEntries[part] ? new TextDecoder().decode(state.packageEntries[part]) : undefined;
     const doc = parseXml(xmlText);
     if (!doc) continue;
-    const text = descendants(doc, "p").map(p => textOf(p).trim()).filter(Boolean).join(" / ");
+    const text = normalizePageFurnitureText(descendants(doc, "p").map(p => textOf(p).trim()).filter(Boolean).join(" / "));
     if (!text) continue;
-    if (localName(ref) === "headerReference") result.headerCenter = text;
-    else result.footerCenter = text;
+    if (localName(ref) === "headerReference") {
+      if (attr(ref, "type") === "first" && !result.headerLeft) result.headerLeft = text;
+      else if (!result.headerCenter) result.headerCenter = text;
+    } else if (!result.footerCenter) {
+      result.footerCenter = text;
+    }
   }
   return result;
+}
+
+function normalizePageFurnitureText(text: string): string {
+  return text
+    .replace(/\bPAGE\s+\d+\b/g, "{page.number}")
+    .replace(/\bNUMPAGES\s+\d+\b/g, "{page.count}")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function headingLevelFromStyle(styleName?: string): number | undefined {
