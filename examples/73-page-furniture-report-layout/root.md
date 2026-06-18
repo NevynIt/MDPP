@@ -1,7 +1,7 @@
 # Page furniture report layout
 
 [md:profile]: md++
-[md:profile-version]: 0.14
+[md:profile-version]: 0.15
 [md:title]: <Page furniture report layout>
 [md:theme]: theme.md
 [md:layout]: layout.md

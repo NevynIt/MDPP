@@ -1,13 +1,13 @@
 # md++ Reference Implementation Components
 
 [md:profile]: md++
-[md:profile-version]: 0.14
+[md:profile-version]: 0.15
 [md:title]: <md++ Reference Implementation Components>
 [md:status]: draft
 
-Status: draft 0.14  
-Document type: Reference implementation planning document  
-Related plugin catalog: `mdpp_reference_plugin_catalog_v0_14.md`
+Status: draft 0.15
+Document type: Reference implementation planning document
+Related plugin catalog: `mdpp_reference_plugin_catalog_v0_15.md`
 
 This document lists the reusable components required to implement md++ tools, with stable boundaries so components can be implemented and tested independently.
 
@@ -493,7 +493,7 @@ Before implementing application shells, stabilize these interfaces:
 8. source map query API;
 9. layout/page model artifact shape.
 
-<!-- BEGIN mdpp-office-pipeline-update-v0-14: components -->
+<!-- BEGIN mdpp-office-pipeline-update-v0-15: components -->
 
 ## 12. Office import and page-furniture component additions
 
@@ -537,4 +537,4 @@ Additional responsibilities:
 - resolve page numbers and page counts after pagination;
 - emit `MDPP0416`, `MDPP0417`, and `MDPP0418` when page-furniture references cannot be resolved.
 
-<!-- END mdpp-office-pipeline-update-v0-14: components -->
+<!-- END mdpp-office-pipeline-update-v0-15: components -->

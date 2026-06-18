@@ -100,7 +100,7 @@ export async function convertDocxToMdpp(input: MdppDocxConvertInput, options: Md
 
   const lines: string[] = [];
   lines.push("[md:profile]: md++");
-  lines.push("[md:profile-version]: 0.14");
+  lines.push("[md:profile-version]: 0.15");
   lines.push(`[md:title]: <${escapeDirectiveValue(options.title ?? input.sourceName ?? "Word import")}>`);
   lines.push("[md:theme]: themes/word-import.theme.md");
   lines.push("[md:layout]: layouts/word-report.layout.md");
@@ -559,7 +559,7 @@ function buildTheme(state: ConversionState, documentXml: Document): string {
   const furniture = extractPageFurniture(state, documentXml);
   const lines: string[] = [];
   lines.push("[md:profile]: md++");
-  lines.push("[md:profile-version]: 0.14");
+  lines.push("[md:profile-version]: 0.15");
   lines.push("[md:title]: <Word import theme>");
   lines.push("[md:stylesheet]: ../styles/word-import.css");
   lines.push("[md:layout]: ../layouts/word-report.layout.md");
@@ -621,7 +621,7 @@ function buildLayout(state: ConversionState, documentXml: Document): string {
   }
   return [
     "[md:profile]: md++",
-    "[md:profile-version]: 0.14",
+    "[md:profile-version]: 0.15",
     "[md:title]: <Word report layout>",
     "",
     "canvas:",

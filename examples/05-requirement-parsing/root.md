@@ -1,5 +1,5 @@
 [md:profile]: md++
-[md:profile-version]: 0.14
+[md:profile-version]: 0.15
 [md:repository:shared]: ./shared
 [md:require]: diagram.mermaid
 [md:require]: diagram.mermaid@10

@@ -1,0 +1,7 @@
+.mdpp-document {
+  color: var(--mdpp-color-text);
+}
+
+.technical-heading {
+  color: var(--mdpp-color-accent);
+}

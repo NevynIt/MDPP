@@ -20,12 +20,12 @@ The macro writes:
 
 ```text
 root.md
+root.md.comments.json
+root.md.import.json
 themes/word-import.theme.md
 layouts/word-report.layout.md
 styles/mdpp-word-base.css
 assets/
-comments/comments.sidecar.json
-comments/import-diagnostics.json
 ```
 
 ## Conversion scope
@@ -58,4 +58,4 @@ Use this macro as an import normalizer:
 DOCX -> md++ files -> text editing -> md++ renderer -> HTML/PDF
 ```
 
-Review the generated `comments/import-diagnostics.json` after export.
+Review the generated `root.md.import.json` after export.

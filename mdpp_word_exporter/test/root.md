@@ -1,13 +1,13 @@
 ﻿[md:profile]: md++
-[md:profile-version]: 0.14
+[md:profile-version]: 0.15
 [md:title]: <md++ Word Export Fixture>
 [md:theme]: ./themes/word-import.theme.md
 [md:layout]: ./layouts/word-report.layout.md
 [md:stylesheet]: ./styles/mdpp-word-base.css
 
 <!-- mdpp-import-source: mdpp_word_export_fixture.docx -->
-<!-- mdpp-sidecar-comments: ./comments/comments.sidecar.json -->
-<!-- mdpp-sidecar-diagnostics: ./comments/import-diagnostics.json -->
+<!-- mdpp-sidecar-comments: ./root.md.comments.json -->
+<!-- mdpp-sidecar-diagnostics: ./root.md.import.json -->
 
 <!-- mdpp-import-warning: floating Word shapes are not placed in source order by this exporter. -->
 
@@ -49,7 +49,7 @@ Representative md++ document directives:
 
 \[md:profile\]: md++ {.word-style-mdpp-code-block}
 
-\[md:profile-version\]: 0.14 {.word-style-mdpp-code-block}
+\[md:profile-version\]: 0.15 {.word-style-mdpp-code-block}
 
 \[md:title\]: <md++ Word Export Fixture> {.word-style-mdpp-code-block}
 

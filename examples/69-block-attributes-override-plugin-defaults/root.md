@@ -1,5 +1,5 @@
 [md:profile]: md++
-[md:profile-version]: 0.14
+[md:profile-version]: 0.15
 [md:theme]: ./theme.md
 [md:require]: model.dot
 [md:require]: diagram.dot.render

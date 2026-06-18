@@ -1,10 +1,6 @@
 [md:profile]: md++
 [md:profile-version]: 0.15
 
-# Base Theme
-
 ## colors
-primary: #204080
-
-## spacing
-medium: 16px
+text: #1f2937
+accent: #2563eb

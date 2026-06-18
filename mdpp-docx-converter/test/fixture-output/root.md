@@ -1,5 +1,5 @@
 [md:profile]: md++
-[md:profile-version]: 0.14
+[md:profile-version]: 0.15
 [md:title]: <Word export fixture import>
 [md:theme]: themes/word-import.theme.md
 [md:layout]: layouts/word-report.layout.md
@@ -43,7 +43,7 @@ Representative md++ document directives:
 
 ```
 [md:profile]: md++
-[md:profile-version]: 0.14
+[md:profile-version]: 0.15
 [md:title]: <md++ Word Export Fixture>
 [md:status]: draft
 [md:require]: include

@@ -1,5 +1,5 @@
 [md:profile]: md++
-[md:profile-version]: 0.14
+[md:profile-version]: 0.15
 [md:title]: <Word import theme>
 [md:stylesheet]: ../styles/word-import.css
 [md:layout]: ../layouts/word-report.layout.md

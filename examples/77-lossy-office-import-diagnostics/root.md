@@ -1,7 +1,7 @@
 # Lossy Office import diagnostics
 
 [md:profile]: md++
-[md:profile-version]: 0.14
+[md:profile-version]: 0.15
 [md:title]: <Lossy Office import diagnostics>
 
 A freeform text box was flattened into a paragraph. {.word-import-flattened-textbox}

@@ -1,11 +1,11 @@
 # md++ Reference Implementation Roadmap
 
 [md:profile]: md++
-[md:profile-version]: 0.14
+[md:profile-version]: 0.15
 [md:title]: <md++ Reference Implementation Roadmap>
 [md:status]: draft
 
-Status: draft 0.14  
+Status: draft 0.15
 Document type: Reference implementation planning document
 
 This document turns the plugin catalog and component architecture into an implementation sequence.
@@ -42,6 +42,7 @@ Deliverables:
 - directive collector;
 - requirement parser;
 - include resolver;
+- theme-context include resolver;
 - repository core;
 - file and memory repository providers;
 - fenced block info-string parser;
@@ -222,7 +223,7 @@ The following should remain explicit TODOs until implementation experience exist
 - pixel-level rendering conformance;
 - plugin marketplace/package distribution rules.
 
-<!-- BEGIN mdpp-office-pipeline-update-v0-14: roadmap -->
+<!-- BEGIN mdpp-office-pipeline-update-v0-15: roadmap -->
 
 ## 11. Milestone 6A: Office import normalization
 
@@ -245,4 +246,4 @@ Exit criteria:
 - unsupported Office features produce stable diagnostic codes;
 - generated md++ can still be rendered by the normal HTML/PDF pipeline.
 
-<!-- END mdpp-office-pipeline-update-v0-14: roadmap -->
+<!-- END mdpp-office-pipeline-update-v0-15: roadmap -->

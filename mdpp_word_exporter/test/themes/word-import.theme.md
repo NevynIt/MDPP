@@ -1,7 +1,7 @@
 ﻿# Word Import Theme
 
 [md:profile]: md++
-[md:profile-version]: 0.14
+[md:profile-version]: 0.15
 [md:title]: <Word Import Theme>
 [md:layout]: ../layouts/word-report.layout.md
 [md:stylesheet]: ../styles/mdpp-word-base.css

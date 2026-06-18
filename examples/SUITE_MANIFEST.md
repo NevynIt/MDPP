@@ -1,4 +1,4 @@
-# md++ v0.14 Example Manifest
+# md++ v0.15 Example Manifest
 
 This manifest turns the language spec, diagnostic catalog, and compliance scenarios into concrete source fixtures.
 
@@ -125,3 +125,4 @@ This manifest turns the language spec, diagnostic catalog, and compliance scenar
 | 75 | `75-office-import-style-classes` | Shows Word/PPT-style named styles normalized into md++ classes. | MDPP0701 ×2 |
 | 76 | `76-office-comments-sidecar` | Keeps imported comments in a sidecar file targeted at anchors in the main document. | MDPP0702 |
 | 77 | `77-lossy-office-import-diagnostics` | Reports lossy import cases for freeform positioning, embedded objects, and precise pagination. | MDPP0700, MDPP0703, MDPP0704 |
+| 78 | `78-theme-include-composition` | Resolves theme-level includes in theme context and applies included tokens, formatting templates, and plugin defaults at the include positions. | none |

@@ -1,14 +1,14 @@
 # md++ Reference Application Profiles
 
 [md:profile]: md++
-[md:profile-version]: 0.14
+[md:profile-version]: 0.15
 [md:title]: <md++ Reference Application Profiles>
 [md:status]: draft
 
-Status: draft 0.14  
-Document type: Reference implementation planning document  
-Related component document: `mdpp_reference_components_v0_14.md`  
-Related plugin catalog: `mdpp_reference_plugin_catalog_v0_14.md`
+Status: draft 0.15
+Document type: Reference implementation planning document
+Related component document: `mdpp_reference_components_v0_15.md`
+Related plugin catalog: `mdpp_reference_plugin_catalog_v0_15.md`
 
 This document describes three target applications and the components/plugins needed to implement them.
 
@@ -261,7 +261,7 @@ Until then, visual editing should be limited to source editing plus rich preview
 13. Dynamic update and patch stabilization.
 14. Editor core prototype.
 
-<!-- BEGIN mdpp-office-pipeline-update-v0-14: application-profiles -->
+<!-- BEGIN mdpp-office-pipeline-update-v0-15: application-profiles -->
 
 ## 6. Target D: Office-to-md++ normalization pipeline
 
@@ -294,4 +294,4 @@ The pipeline should support:
 | `@mdpp/diagnostics` | Emit stable lossy-import diagnostics. |
 | `@mdpp/schemas` | Validate generated artifacts and sidecars. |
 
-<!-- END mdpp-office-pipeline-update-v0-14: application-profiles -->
+<!-- END mdpp-office-pipeline-update-v0-15: application-profiles -->

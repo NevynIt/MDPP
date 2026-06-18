@@ -1,27 +1,27 @@
 # md++ Reference Runtime Architecture
 
 [md:profile]: md++
-[md:profile-version]: 0.14
+[md:profile-version]: 0.15
 [md:title]: <md++ Reference Runtime Architecture>
 [md:status]: draft
 
-Status: draft 0.14  
-Document type: Reference implementation architecture  
-Related language spec: `mdpp_language_spec_v0_14.md`
+Status: draft 0.15
+Document type: Reference implementation architecture
+Related language spec: `mdpp_language_spec_v0_15.md`
 
 This document describes a recommended architecture for implementing md++ processors, renderers, editors, repositories, plugins, transformations, and interactive outputs.
 
 Related documents:
 
-- `mdpp_language_spec_v0_14.md`
-- `mdpp_diagnostic_catalog_v0_14.md`
-- `mdpp_artifact_schemas_v0_14.schema.json`
-- `implementation/mdpp_reference_plugin_catalog_v0_14.md`
-- `implementation/mdpp_reference_components_v0_14.md`
-- `implementation/mdpp_application_profiles_v0_14.md`
-- `implementation/mdpp_implementation_roadmap_v0_14.md`
+- `mdpp_language_spec_v0_15.md`
+- `mdpp_diagnostic_catalog_v0_15.md`
+- `mdpp_artifact_schemas_v0_15.schema.json`
+- `implementation/mdpp_reference_plugin_catalog_v0_15.md`
+- `implementation/mdpp_reference_components_v0_15.md`
+- `implementation/mdpp_application_profiles_v0_15.md`
+- `implementation/mdpp_implementation_roadmap_v0_15.md`
 
-The normative Markdown-compatible authoring profile is defined separately in `mdpp_language_spec_v0_14.md`.
+The normative Markdown-compatible authoring profile is defined separately in `mdpp_language_spec_v0_15.md`.
 
 ---
 
@@ -45,25 +45,25 @@ Host-specific implementation choices remain allowed unless this architecture exp
 
 ## 2. Runtime design principles
 
-1. **The language remains Markdown-based**  
+1. **The language remains Markdown-based**
    Runtime architecture must not add author-facing syntax that belongs outside the md++ language specification.
 
-2. **The host owns policy**  
+2. **The host owns policy**
    Resource access, plugin loading, persistence, remote fetching, unsafe HTML, stylesheets, fonts, interactions, workers, and jobs are governed by host policy.
 
-3. **Plugins communicate through APIs, not ambient access**  
+3. **Plugins communicate through APIs, not ambient access**
    Portable plugins should not depend on direct filesystem, network, process, or live DOM access.
 
-4. **Runtime exchange uses typed document artifacts**  
+4. **Runtime exchange uses typed document artifacts**
    Hosts, repositories, renderers, and plugins exchange typed document artifacts plus structured diagnostics.
 
-5. **Rendering is one transformation**  
+5. **Rendering is one transformation**
    The same architecture can support parsing, validation, import, export, analysis, publishing, and rendering.
 
-6. **Worker boundaries use serializable data**  
+6. **Worker boundaries use serializable data**
    Portable renderers and plugins exchange snapshots, patches, source maps, interactions, resources, plugin lists, state, and diagnostics as serializable objects.
 
-7. **Plugin-specific behavior stays plugin-specific**  
+7. **Plugin-specific behavior stays plugin-specific**
    The architecture defines dispatch points and exchange contracts. Specialized behavior such as area rendering, diagram rendering, model parsing, importers, exporters, and layout interpretation belongs to plugins or host-selected providers.
 
 ---
@@ -150,7 +150,7 @@ Diagnostics remain structured sidecar data even when they are also materialized 
 
 #### 3.2.1. Open standardization items
 
-The base artifact shape is intentionally small in draft 0.14. The following details are TODOs for a later runtime release:
+The base artifact shape is intentionally small in draft 0.15. The following details are TODOs for a later runtime release:
 
 - artifact identifier stability across sessions;
 - artifact version semantics;
@@ -1351,7 +1351,7 @@ Recommended manifest shape:
 
 ```json
 {
-  "schema": "https://schemas.mdpp.example/mdpp-plugin-manifest-v0.14.schema.json",
+  "schema": "https://schemas.mdpp.example/mdpp-plugin-manifest-v0.15.schema.json",
   "id": "diagram.mermaid",
   "name": "Mermaid diagram renderer",
   "version": "10.0.0",
@@ -1884,7 +1884,7 @@ Hosts may combine phases internally, but diagnostics and observable behavior sho
 
 ## 8. Diagnostics, tracing, and auditability
 
-Runtime components SHOULD report diagnostics rather than throwing host-visible failures for ordinary authoring or processing errors. Stable diagnostic codes are maintained in `mdpp_diagnostic_catalog_v0_14.md`.
+Runtime components SHOULD report diagnostics rather than throwing host-visible failures for ordinary authoring or processing errors. Stable diagnostic codes are maintained in `mdpp_diagnostic_catalog_v0_15.md`.
 
 Diagnostics should be structured, should include source-origin information when available, and should identify the responsible component, resource, plugin, model, layout, or area when relevant.
 
@@ -1924,15 +1924,15 @@ These are host responsibilities or implementation choices. The architecture defi
 
 ---
 
-## 10. Changes in draft 0.14
+## 10. Changes in draft 0.15
 
-Draft 0.14 adds conformance language, a JSON-RPC worker IPC/RPC profile, plugin manifests, lifecycle event hooks, repository canonicalization rules, patch/update invariants, layout interpretation and area rendering as plugin-owned concerns, a default dispatch table, references to the separate diagnostic catalog, and references to the JSON Schema skeleton.
+Draft 0.15 adds theme-level include composition, repeated-theme override clarifications, conformance language, a JSON-RPC worker IPC/RPC profile, plugin manifests, lifecycle event hooks, repository canonicalization rules, patch/update invariants, layout interpretation and area rendering as plugin-owned concerns, a default dispatch table, references to the separate diagnostic catalog, and references to the JSON Schema skeleton.
 
-<!-- BEGIN mdpp-office-pipeline-update-v0-14: runtime -->
+<!-- BEGIN mdpp-office-pipeline-update-v0-15: runtime -->
 
 ## Addendum: Office import, sidecars, theme declarations, and page furniture
 
-This runtime addendum extends the v0.14 reference architecture with exchange responsibilities for the Office-normalization pipeline.
+This runtime addendum extends the v0.15 reference architecture with exchange responsibilities for the Office-normalization pipeline.
 
 An Office-like importer is a lossy semantic transformation:
 
@@ -1942,7 +1942,7 @@ office.docx | office.pptx -> mdpp.source + mdpp.comment-sidecar? + diagnostics
 
 The importer should produce semantic md++ source first. It should not encode the full Office object model as custom inline syntax. Named source styles should become attribute-list classes when safe. Comments, review notes, speaker notes, and traceability metadata should become `mdpp.comment-sidecar` artifacts associated with the generated md++ document.
 
-The presentation resolver should expose theme tokens, class declarations, component declarations, page-furniture profiles, assets, stylesheets, and plugin defaults as a single `mdpp.presentation-context` artifact. The layout interpreter chooses active page furniture after the active layout and theme are known. The paginator resolves `{page.number}` and `{page.count}` after page generation.
+The presentation resolver should resolve theme-level includes in theme context before exposing theme tokens, class declarations, component declarations, page-furniture profiles, assets, stylesheets, and plugin defaults as a single `mdpp.presentation-context` artifact. The layout interpreter chooses active page furniture after the active layout and theme are known. The paginator resolves `{page.number}` and `{page.count}` after page generation.
 
 Recommended additional document types:
 
@@ -1954,4 +1954,4 @@ Recommended additional document types:
 
 Import diagnostics should use `MDPP0700`-range codes. Page-furniture and richer-theme diagnostics should use `MDPP0413`-`MDPP0418`.
 
-<!-- END mdpp-office-pipeline-update-v0-14: runtime -->
+<!-- END mdpp-office-pipeline-update-v0-15: runtime -->

@@ -1,14 +1,14 @@
 # md++ Reference Plugin Catalog
 
 [md:profile]: md++
-[md:profile-version]: 0.14
+[md:profile-version]: 0.15
 [md:title]: <md++ Reference Plugin Catalog>
 [md:status]: draft
 
-Status: draft 0.14  
-Document type: Reference implementation planning document  
-Related language spec: `../specs/mdpp_language_spec_v0_14.md`  
-Related runtime architecture: `../specs/mdpp_reference_runtime_architecture_v0_14.md`
+Status: draft 0.15
+Document type: Reference implementation planning document
+Related language spec: `../specs/mdpp_language_spec_v0_15.md`
+Related runtime architecture: `../specs/mdpp_reference_runtime_architecture_v0_15.md`
 
 This document describes a practical set of plugins that can provide useful md++ capability for three implementation targets:
 
@@ -403,7 +403,7 @@ The following should remain tracked in the runtime architecture or future implem
 - editor-grade reversible transformations between source and rendered structure;
 - packaging format for browser-friendly md++ bundles.
 
-<!-- BEGIN mdpp-office-pipeline-update-v0-14: plugin-catalog -->
+<!-- BEGIN mdpp-office-pipeline-update-v0-15: plugin-catalog -->
 
 ## 7. Office import and presentation helper plugins
 
@@ -423,4 +423,4 @@ import.office.openxml
 presentation.theme-classes
 ```
 
-<!-- END mdpp-office-pipeline-update-v0-14: plugin-catalog -->
+<!-- END mdpp-office-pipeline-update-v0-15: plugin-catalog -->

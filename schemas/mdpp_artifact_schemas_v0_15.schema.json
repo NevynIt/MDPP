@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.mdpp.example/mdpp-artifacts-v0.14.schema.json",
+  "$id": "https://schemas.mdpp.example/mdpp-artifacts-v0.15.schema.json",
   "title": "md++ exchanged artifact schemas",
   "description": "Draft skeleton JSON Schema definitions for md++ runtime exchanged artifacts. This is intentionally incomplete and will be expanded in later drafts.",
   "type": "object",

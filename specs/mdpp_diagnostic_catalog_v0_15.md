@@ -1,14 +1,14 @@
 # md++ Diagnostic Catalog
 
 [md:profile]: md++
-[md:profile-version]: 0.14
+[md:profile-version]: 0.15
 [md:title]: <md++ Diagnostic Catalog>
 [md:status]: draft
 
-Status: draft 0.14  
-Document type: Diagnostic code catalog  
-Related language spec: `mdpp_language_spec_v0_14.md`  
-Related runtime architecture: `mdpp_reference_runtime_architecture_v0_14.md`
+Status: draft 0.15
+Document type: Diagnostic code catalog
+Related language spec: `mdpp_language_spec_v0_15.md`
+Related runtime architecture: `mdpp_reference_runtime_architecture_v0_15.md`
 
 This document assigns stable diagnostic codes for md++ language processors, runtime hosts, plugins, editors, reports, and tests.
 

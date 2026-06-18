@@ -4,16 +4,16 @@ Option Explicit
 ' md++ Word Exporter
 ' Exports a normal Word document to a semantic md++ bundle:
 '   root.md
+'   root.md.comments.json
+'   root.md.import.json
 '   themes/word-import.theme.md
 '   layouts/word-report.layout.md
 '   styles/mdpp-word-base.css
-'   comments/comments.sidecar.json
-'   comments/import-diagnostics.json
 '   assets/*
 '
 ' Import this .bas file into Word VBA, then run ExportActiveDocumentToMdpp.
 
-Private Const MDPP_PROFILE_VERSION As String = "0.14"
+Private Const MDPP_PROFILE_VERSION As String = "0.15"
 Private Const DEFAULT_THEME_FILE As String = "./themes/word-import.theme.md"
 Private Const DEFAULT_LAYOUT_FILE As String = "./layouts/word-report.layout.md"
 Private Const DEFAULT_STYLESHEET_FILE As String = "./styles/mdpp-word-base.css"
@@ -109,8 +109,8 @@ Public Sub ExportActiveDocumentToMdppFolder(ByVal exportRoot As String)
     WriteUtf8 fso.BuildPath(fso.BuildPath(exportRoot, "themes"), "word-import.theme.md"), themeMd
     WriteUtf8 fso.BuildPath(fso.BuildPath(exportRoot, "layouts"), "word-report.layout.md"), layoutMd
     WriteUtf8 fso.BuildPath(fso.BuildPath(exportRoot, "styles"), "mdpp-word-base.css"), css
-    WriteUtf8 fso.BuildPath(fso.BuildPath(exportRoot, "comments"), "comments.sidecar.json"), commentsJson
-    WriteUtf8 fso.BuildPath(fso.BuildPath(exportRoot, "comments"), "import-diagnostics.json"), diagnosticsJson
+    WriteUtf8 fso.BuildPath(exportRoot, "root.md.comments.json"), commentsJson
+    WriteUtf8 fso.BuildPath(exportRoot, "root.md.import.json"), diagnosticsJson
 
     ExportStatus "Completed"
     EndExportStatus
@@ -208,8 +208,8 @@ Private Function BuildRootMarkdown(ByVal doc As Document, ByVal imageFiles As Co
     sb = sb & "[md:stylesheet]: " & DEFAULT_STYLESHEET_FILE & vbCrLf
     sb = sb & vbCrLf
     sb = sb & "<!-- mdpp-import-source: " & HtmlCommentSafe(doc.Name) & " -->" & vbCrLf
-    sb = sb & "<!-- mdpp-sidecar-comments: ./comments/comments.sidecar.json -->" & vbCrLf
-    sb = sb & "<!-- mdpp-sidecar-diagnostics: ./comments/import-diagnostics.json -->" & vbCrLf
+    sb = sb & "<!-- mdpp-sidecar-comments: ./root.md.comments.json -->" & vbCrLf
+    sb = sb & "<!-- mdpp-sidecar-diagnostics: ./root.md.import.json -->" & vbCrLf
     sb = sb & vbCrLf
 
     If doc.Shapes.Count > 0 Then
@@ -1126,7 +1126,7 @@ Private Sub AddUnsupportedInlineStyleDiagnostic(ByVal doc As Document, ByVal dia
     Dim detail As String
     detail = CharacterFormattingDiagnosticLabel(characterKey)
 
-    AddDiagnostic diagnostics, "Character-level " & detail & " was not emitted inline because md++ 0.14 has no portable inline attribute-list syntax. Whole-paragraph character formatting is promoted to a paragraph class instead.", macroProcedure, macroStep & " inline style", sourceRange, doc.Name, "inline-style", "start " & CStr(runStart) & " end " & CStr(runEnd), 0, ""
+    AddDiagnostic diagnostics, "Character-level " & detail & " was not emitted inline because md++ 0.15 has no portable inline attribute-list syntax. Whole-paragraph character formatting is promoted to a paragraph class instead.", macroProcedure, macroStep & " inline style", sourceRange, doc.Name, "inline-style", "start " & CStr(runStart) & " end " & CStr(runEnd), 0, ""
 End Sub
 
 Private Function CharacterFormattingDiagnosticLabel(ByVal characterKey As String) As String

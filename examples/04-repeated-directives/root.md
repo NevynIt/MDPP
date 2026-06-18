@@ -1,5 +1,5 @@
 [md:profile]: md++
-[md:profile-version]: 0.14
+[md:profile-version]: 0.15
 [md:require]: math.latex
 [md:stylesheet]: a.css
 [md:theme]: base.md
