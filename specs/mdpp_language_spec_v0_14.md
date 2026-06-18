@@ -504,6 +504,8 @@ Directive scope after include resolution:
 - `[md:title]:`, `[md:status]:`, and other document metadata directives in included files describe the included source file only. They do not override root document metadata in the portable core profile.
 - `[md:theme]:`, `[md:layout]:`, and `[md:stylesheet]:` directives from included files participate in the resolved presentation context in resolved source order unless the host parses the included file in a non-document resource context.
 
+When `[md:include]:` appears inside a theme resource, the included file is parsed in theme context. Its theme declarations, formatting templates, theme-level includes, layout directives, stylesheet directives, plugin defaults, component defaults, assets, and font assets contribute to the including theme at the include position. They do not contribute ordinary document body content to the root document.
+
 ### Repositories
 
 Repositories define named roots for includes and plugin resources:
@@ -644,7 +646,9 @@ The theme directive declares a theme resource:
 [md:theme]: shared:themes/company.theme.md
 ```
 
-A theme resource is an md++ file parsed in theme context. It may contain design tokens, formatting templates, component defaults, plugin defaults, assets, page furniture, and may declare layouts and stylesheets using normal md++ directives.
+A theme resource is an md++ file parsed in theme context. It may contain design tokens, formatting templates, component defaults, plugin defaults, assets, page furniture, and may declare includes, layouts, and stylesheets using normal md++ directives.
+
+A theme-level `[md:include]:` directive composes another Markdown-compatible theme file or theme fragment into the including theme at the directive position. The included file is parsed in theme context and contributes to the same theme resource unless a host-specific extension explicitly defines another resource context.
 
 Example:
 
@@ -657,6 +661,7 @@ Example:
 [md:layout]: ./report.layout.md
 [md:stylesheet]: ./base.css
 [md:stylesheet]: ./components.css
+[md:include]: ./technical-writing.theme.md
 
 ## formatting
 default-template: standard
@@ -732,6 +737,7 @@ Theme key/value declarations are not YAML. A portable processor MUST parse them 
 A theme may provide:
 
 - design tokens such as colors, fonts, spacing, line weights, shadows, and palettes;
+- included theme fragments;
 - a default formatting template;
 - named formatting templates;
 - default layout references;
@@ -742,6 +748,35 @@ A theme may provide:
 - asset and font references.
 
 Theme vocabularies may evolve by profile and host. Portable themes should prefer simple Markdown headings and md++ key/value declarations.
+
+### Theme composition
+
+Themes are composable presentation resources. A document may apply multiple themes using repeated `[md:theme]:` directives, and a theme may use `[md:include]:` to split its own declarations across several files.
+
+A theme included from another theme is processed at the include position in the including theme. Theme declarations from included files use the same resolution and override rules as declarations written directly in the including theme.
+
+A theme that contains only formatting templates, only tokens, only layout or stylesheet references, or only plugin defaults is still an ordinary theme. The portable core profile does not define a separate formatting-template resource directive.
+
+Example:
+
+```markdown
+# Company Theme
+
+[md:profile]: md++
+[md:profile-version]: 0.15
+[md:stylesheet]: ./company.css
+[md:include]: ./theme.tokens.md
+[md:include]: ./theme.formatting.md
+[md:include]: ./theme.plugins.md
+```
+
+A document may also compose theme layers directly:
+
+```markdown
+[md:theme]: ./themes/company-base.theme.md
+[md:theme]: ./themes/technical-writing.theme.md
+[md:theme]: ./themes/api-sections.theme.md
+```
 
 ### Formatting templates
 
@@ -912,7 +947,7 @@ Stylesheets are intended for advanced users, theme authors, and host/plugin impl
 
 ### Resolution and override order
 
-Presentation resources are resolved in source order after includes and repositories are resolved.
+Presentation resources are resolved in source order after includes and repositories are resolved. Theme-level includes are resolved within the including theme before that theme contributes its declarations to the document presentation context.
 
 Recommended precedence, from lowest to highest:
 
@@ -1121,13 +1156,13 @@ A document may declare multiple themes.
 [md:theme]: ./themes/report.theme.md
 ```
 
-Themes are resolved in source order.
+Themes are resolved in source order. A theme that includes other theme files is first resolved in theme context; its included declarations then participate at the include positions.
 
-Later themes override earlier token values, formatting templates with the same names, component defaults, and plugin defaults with the same names.
+Later themes override earlier token values, formatting templates with the same names, component defaults, and plugin defaults with the same names. The latest resolved `default-template` value wins.
 
-Layouts and stylesheets declared by themes are accumulated in source order unless a later resource explicitly replaces a named layout.
+Layouts and stylesheets declared by themes are accumulated in resolved source order unless a later resource explicitly replaces a named layout.
 
-A host should report diagnostics when multiple themes define incompatible layout names, unsupported token values, duplicate formatting-template rule names, or conflicting asset declarations.
+A host should report diagnostics when multiple themes define incompatible layout names, unsupported token values, duplicate formatting-template rule names within the same template, or conflicting asset declarations.
 
 #### Layout styling and theme tokens
 
