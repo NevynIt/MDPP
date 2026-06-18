@@ -44,11 +44,13 @@ DOCX bytes
 
 ## Diagnostic approach
 
-Lossy or unsupported features are not silently dropped when detectable. The converter writes diagnostics to both the returned result and `comments/import-diagnostics.json`.
+Lossy or unsupported features are not silently dropped when detectable. The converter writes diagnostics to both the returned result and `root.md.import.json`, following the Office import profile sidecar naming convention.
 
 The diagnostic codes are aligned with the proposed md++ Office-import diagnostics:
 
-- `MDPP0417`: imported table degraded.
-- `MDPP0418`: floating/freeform layout degraded.
-- `MDPP0419`: linked/unsupported embedded object degraded.
-- `MDPP0420`: unsupported imported object skipped or flattened.
+- `MDPP0700`: source feature omitted or simplified during import.
+- `MDPP0701`: imported source style mapped to an md++ class.
+- `MDPP0702`: imported comment or review note moved to a sidecar.
+- `MDPP0703`: imported embedded object extracted as a static asset or placeholder.
+- `MDPP0704`: source pagination could not be preserved exactly.
+- `MDPP0705`: import sidecar reference could not be resolved or anchored.

@@ -1,6 +1,7 @@
 {
   "type": "mdpp.comments.sidecar",
   "version": "0.1",
+  "source": "mdpp_word_export_fixture.docx",
   "comments": [
     {
       "id": "0",

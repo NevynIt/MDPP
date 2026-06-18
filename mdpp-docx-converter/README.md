@@ -4,12 +4,12 @@ A small Node.js / browser-embeddable prototype that converts a `.docx` package i
 
 ```text
 root.md
+root.md.comments.json
+root.md.import.json
 themes/word-import.theme.md
 layouts/word-report.layout.md
 styles/word-import.css
 assets/*
-comments/comments.sidecar.json
-comments/import-diagnostics.json
 ```
 
 ## Install and build
@@ -68,9 +68,9 @@ Implemented:
 - Embedded images copied from `word/media/*` to `assets/*`.
 - Image width/height from DrawingML extent when available.
 - Floating images converted to anchored Markdown images with diagnostics.
-- Comments sidecar from `word/comments.xml`.
 - Basic header/footer text mapped into theme page furniture.
-- Import diagnostics JSON.
+- Comments sidecar from `word/comments.xml` using the Office import profile naming convention.
+- Import diagnostics in `root.md.import.json` using `MDPP0700`-range codes.
 
 Not yet implemented or deliberately lossy:
 

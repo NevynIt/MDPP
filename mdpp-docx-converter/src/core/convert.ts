@@ -61,6 +61,8 @@ interface ConversionState {
   packageEntries: Record<string, Uint8Array>;
   imageCounter: number;
   usedStyleClasses: Set<string>;
+  diagnosedStyleClasses: Set<string>;
+  diagnosedUnsafeStyles: Set<string>;
   commentAnchors: ImportedCommentAnchor[];
   options: Required<Pick<MdppDocxConvertOptions, "rootFileName" | "includeRawStyleClasses" | "commentAnchorMode" | "imageBaseName" | "emitSimpleMarkdownTables">> & MdppDocxConvertOptions;
 }
@@ -80,6 +82,8 @@ export async function convertDocxToMdpp(input: MdppDocxConvertInput, options: Md
     packageEntries: pkg.entries,
     imageCounter: 1,
     usedStyleClasses: new Set(),
+    diagnosedStyleClasses: new Set(),
+    diagnosedUnsafeStyles: new Set(),
     commentAnchors: [],
     options: {
       rootFileName: options.rootFileName ?? "root.md",
@@ -136,7 +140,7 @@ export async function convertDocxToMdpp(input: MdppDocxConvertInput, options: Md
       lines.push("");
     } else {
       state.diagnostics.push({
-        code: "MDPP0420",
+        code: "MDPP0700",
         severity: "warning",
         message: `Unsupported top-level Word element '${localName(node)}' was skipped.`,
         wordPart: "word/document.xml"
@@ -144,12 +148,16 @@ export async function convertDocxToMdpp(input: MdppDocxConvertInput, options: Md
     }
   }
 
+  addCommentSidecarDiagnostics(state, input.sourceName);
+  const commentsPath = sidecarPath(state.options.rootFileName, "comments.json");
+  const importPath = sidecarPath(state.options.rootFileName, "import.json");
+
   state.files.push({ path: state.options.rootFileName, content: lines.join("\n").replace(/\n{3,}/g, "\n\n"), mediaType: "text/markdown" });
   state.files.push({ path: "themes/word-import.theme.md", content: buildTheme(state, documentXml), mediaType: "text/markdown" });
   state.files.push({ path: "layouts/word-report.layout.md", content: buildLayout(state, documentXml), mediaType: "text/markdown" });
   state.files.push({ path: "styles/word-import.css", content: buildCss(state), mediaType: "text/css" });
-  state.files.push({ path: "comments/comments.sidecar.json", content: JSON.stringify(buildCommentsSidecar(state), null, 2) + "\n", mediaType: "application/json" });
-  state.files.push({ path: "comments/import-diagnostics.json", content: JSON.stringify(state.diagnostics, null, 2) + "\n", mediaType: "application/json" });
+  state.files.push({ path: commentsPath, content: JSON.stringify(buildCommentsSidecar(state, input.sourceName), null, 2) + "\n", mediaType: "application/json" });
+  state.files.push({ path: importPath, content: JSON.stringify(buildImportSidecar(state, input.sourceName), null, 2) + "\n", mediaType: "application/json" });
 
   return { files: state.files, diagnostics: state.diagnostics };
 }
@@ -234,11 +242,48 @@ function blockAttributes(info: ParagraphInfo, anchorIds: string[], state: Conver
   for (const anchorId of anchorIds) attrs[`#${anchorId}`] = true;
   if (info.semantic.kind === "callout") attrs[`.${info.semantic.className}`] = true;
   if (info.semantic.kind === "callout") state.usedStyleClasses.add(info.semantic.className);
-  if (shouldEmitRawStyleClass(info) && info.className) {
-    attrs[`.${info.className}`] = true;
-    state.usedStyleClasses.add(info.className);
+  if (shouldEmitRawStyleClass(info)) {
+    if (info.className) {
+      attrs[`.${info.className}`] = true;
+      state.usedStyleClasses.add(info.className);
+      addStyleClassDiagnostic(info, state);
+    } else {
+      addUnsafeStyleDiagnostic(info, state);
+    }
   }
   return mdAttributes(attrs);
+}
+
+function addStyleClassDiagnostic(info: ParagraphInfo, state: ConversionState): void {
+  if (!info.className || state.diagnosedStyleClasses.has(info.className)) return;
+  state.diagnosedStyleClasses.add(info.className);
+  state.diagnostics.push({
+    code: "MDPP0701",
+    severity: "info",
+    message: `Source style '${info.styleName ?? info.styleId ?? info.className}' was converted to md++ class '.${info.className}'.`,
+    wordPart: "word/styles.xml",
+    detail: {
+      styleId: info.styleId,
+      styleName: info.styleName,
+      className: info.className
+    }
+  });
+}
+
+function addUnsafeStyleDiagnostic(info: ParagraphInfo, state: ConversionState): void {
+  const styleKey = info.styleId ?? info.styleName;
+  if (!styleKey || state.diagnosedUnsafeStyles.has(styleKey)) return;
+  state.diagnosedUnsafeStyles.add(styleKey);
+  state.diagnostics.push({
+    code: "MDPP0700",
+    severity: "warning",
+    message: `Source style '${info.styleName ?? info.styleId}' could not be normalized to a safe md++ class.`,
+    wordPart: "word/styles.xml",
+    detail: {
+      styleId: info.styleId,
+      styleName: info.styleName
+    }
+  });
 }
 
 function shouldEmitRawStyleClass(info: ParagraphInfo): boolean {
@@ -296,7 +341,7 @@ function inlineContent(parent: Element, state: ConversionState): string {
         break;
       case "ins":
         state.diagnostics.push({
-          code: "MDPP0416",
+          code: "MDPP0700",
           severity: "warning",
           message: "Tracked insertion was accepted into the Markdown output.",
           wordPart: "word/document.xml",
@@ -306,7 +351,7 @@ function inlineContent(parent: Element, state: ConversionState): string {
         break;
       case "del":
         state.diagnostics.push({
-          code: "MDPP0416",
+          code: "MDPP0700",
           severity: "warning",
           message: "Tracked deletion was omitted from the Markdown output.",
           wordPart: "word/document.xml",
@@ -391,25 +436,25 @@ function drawingToMarkdown(drawing: Element, state: ConversionState): string {
   const blip = firstDescendant(drawing, "blip");
   const relId = attr(blip, "embed") ?? attr(blip, "link");
   if (!relId) {
-    state.diagnostics.push({ code: "MDPP0420", severity: "warning", message: "Drawing without image relationship was skipped.", wordPart: "word/document.xml" });
+    state.diagnostics.push({ code: "MDPP0700", severity: "warning", message: "Drawing without image relationship was skipped.", wordPart: "word/document.xml" });
     return "";
   }
 
   const rel = state.rels.get(relId);
   if (!rel) {
-    state.diagnostics.push({ code: "MDPP0420", severity: "warning", message: `Image relationship '${relId}' was not found.`, wordPart: "word/_rels/document.xml.rels" });
+    state.diagnostics.push({ code: "MDPP0700", severity: "warning", message: `Image relationship '${relId}' was not found.`, wordPart: "word/_rels/document.xml.rels" });
     return "";
   }
 
   if (rel.targetMode === "External") {
-    state.diagnostics.push({ code: "MDPP0419", severity: "warning", message: `External linked image '${rel.target}' was referenced, not embedded.`, wordPart: "word/document.xml" });
+    state.diagnostics.push({ code: "MDPP0703", severity: "warning", message: `External linked image '${rel.target}' was referenced, not embedded.`, wordPart: "word/document.xml" });
     return `![linked image](${rel.target})`;
   }
 
   const sourcePath = resolvePartTarget("word/document.xml", rel.target);
   const imageBytes = state.packageEntries[sourcePath];
   if (!imageBytes) {
-    state.diagnostics.push({ code: "MDPP0420", severity: "warning", message: `Image part '${sourcePath}' was not found.`, wordPart: sourcePath });
+    state.diagnostics.push({ code: "MDPP0700", severity: "warning", message: `Image part '${sourcePath}' was not found.`, wordPart: sourcePath });
     return "";
   }
 
@@ -425,7 +470,7 @@ function drawingToMarkdown(drawing: Element, state: ConversionState): string {
   const cy = Number(attr(extent, "cy"));
   const isFloating = !!firstDescendant(drawing, "anchor");
   if (isFloating) {
-    state.diagnostics.push({ code: "MDPP0418", severity: "warning", message: "Floating image was converted to an anchored Markdown image; exact Word wrapping/z-order may be lost.", wordPart: "word/document.xml" });
+    state.diagnostics.push({ code: "MDPP0700", severity: "warning", message: "Floating image was converted to an anchored Markdown image; exact Word wrapping/z-order may be lost.", wordPart: "word/document.xml" });
   }
 
   const attrs = mdAttributes({
@@ -443,14 +488,14 @@ function tableToMarkdown(tbl: Element, state: ConversionState): string {
   const maxCols = Math.max(0, ...matrix.map(r => r.length));
   if (normalized.hasMergedCells) {
     state.diagnostics.push({
-      code: "MDPP0417",
+      code: "MDPP0700",
       severity: "warning",
       message: "Merged Word table cells were normalized to Markdown table rows; exact merge geometry was not preserved.",
       wordPart: "word/document.xml"
     });
   }
   if (!state.options.emitSimpleMarkdownTables || maxCols === 0) {
-    state.diagnostics.push({ code: "MDPP0417", severity: "warning", message: "Table could not be represented as a Markdown table and was emitted as plain text rows.", wordPart: "word/document.xml" });
+    state.diagnostics.push({ code: "MDPP0700", severity: "warning", message: "Table could not be represented as a Markdown table and was emitted as plain text rows.", wordPart: "word/document.xml" });
     return matrix.map(row => row.filter(Boolean).join(" | ")).filter(Boolean).join("\n");
   }
   const title = normalized.title ? `${normalized.title}\n\n` : "";
@@ -567,7 +612,7 @@ function buildLayout(state: ConversionState, documentXml: Document): string {
   }));
   if (orientations.size > 1) {
     state.diagnostics.push({
-      code: "MDPP0418",
+      code: "MDPP0704",
       severity: "warning",
       message: "Multiple Word section orientations were normalized to a single md++ layout orientation.",
       wordPart: "word/document.xml",
@@ -633,10 +678,11 @@ function buildCss(state: ConversionState): string {
 `;
 }
 
-function buildCommentsSidecar(state: ConversionState) {
+function buildCommentsSidecar(state: ConversionState, sourceName: string | undefined) {
   return {
     type: "mdpp.comments.sidecar",
     version: "0.1",
+    source: sourceName,
     comments: [...state.comments.values()].map(c => ({
       id: c.id,
       author: c.author,
@@ -645,6 +691,45 @@ function buildCommentsSidecar(state: ConversionState) {
       anchors: state.commentAnchors.filter(a => a.commentId === c.id).map(a => ({ id: a.id, paragraphIndex: a.paragraphIndex }))
     }))
   };
+}
+
+function buildImportSidecar(state: ConversionState, sourceName: string | undefined) {
+  return {
+    type: "mdpp.import.sidecar",
+    version: "0.1",
+    source: sourceName,
+    generatedRoot: state.options.rootFileName,
+    diagnostics: state.diagnostics
+  };
+}
+
+function addCommentSidecarDiagnostics(state: ConversionState, sourceName: string | undefined): void {
+  if (state.comments.size === 0) return;
+  state.diagnostics.push({
+    code: "MDPP0702",
+    severity: "info",
+    message: `Imported ${state.comments.size} Word comment${state.comments.size === 1 ? "" : "s"} moved to sidecar metadata.`,
+    source: sourceName,
+    wordPart: "word/comments.xml",
+    detail: { count: state.comments.size }
+  });
+
+  const anchoredCommentIds = new Set(state.commentAnchors.map(a => a.commentId));
+  for (const comment of state.comments.values()) {
+    if (anchoredCommentIds.has(comment.id)) continue;
+    state.diagnostics.push({
+      code: "MDPP0705",
+      severity: "warning",
+      message: `Imported Word comment '${comment.id}' could not be anchored to generated Markdown.`,
+      source: sourceName,
+      wordPart: "word/comments.xml",
+      detail: { commentId: comment.id }
+    });
+  }
+}
+
+function sidecarPath(rootFileName: string, suffix: string): string {
+  return `${rootFileName}.${suffix}`;
 }
 
 function extractPageFurniture(state: ConversionState, documentXml: Document): Record<string, string> {

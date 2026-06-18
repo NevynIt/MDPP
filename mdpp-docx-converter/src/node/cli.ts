@@ -36,7 +36,7 @@ async function main() {
   await writeGeneratedFiles(args.outDir, result.files);
   const warnings = result.diagnostics.filter(d => d.severity !== "info");
   console.error(`Wrote ${result.files.length} files to ${args.outDir}`);
-  if (warnings.length) console.error(`Diagnostics: ${warnings.length} warning/error entries written to comments/import-diagnostics.json`);
+  if (warnings.length) console.error(`Diagnostics: ${warnings.length} warning/error entries written to root.md.import.json`);
 }
 
 main().catch(err => {

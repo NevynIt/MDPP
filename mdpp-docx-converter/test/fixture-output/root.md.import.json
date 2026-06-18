@@ -1,0 +1,115 @@
+{
+  "type": "mdpp.import.sidecar",
+  "version": "0.1",
+  "source": "mdpp_word_export_fixture.docx",
+  "generatedRoot": "root.md",
+  "diagnostics": [
+    {
+      "code": "MDPP0701",
+      "severity": "info",
+      "message": "Source style 'MDPP Lead' was converted to md++ class '.word-style-mdpp-lead'.",
+      "wordPart": "word/styles.xml",
+      "detail": {
+        "styleId": "MDPPLead",
+        "styleName": "MDPP Lead",
+        "className": "word-style-mdpp-lead"
+      }
+    },
+    {
+      "code": "MDPP0701",
+      "severity": "info",
+      "message": "Source style 'Spec Note' was converted to md++ class '.word-style-spec-note'.",
+      "wordPart": "word/styles.xml",
+      "detail": {
+        "styleId": "SpecNote",
+        "styleName": "Spec Note",
+        "className": "word-style-spec-note"
+      }
+    },
+    {
+      "code": "MDPP0701",
+      "severity": "info",
+      "message": "Source style 'Executive Summary' was converted to md++ class '.word-style-executive-summary'.",
+      "wordPart": "word/styles.xml",
+      "detail": {
+        "styleId": "ExecutiveSummary",
+        "styleName": "Executive Summary",
+        "className": "word-style-executive-summary"
+      }
+    },
+    {
+      "code": "MDPP0701",
+      "severity": "info",
+      "message": "Source style 'MDPP Callout Warning' was converted to md++ class '.word-style-mdpp-callout-warning'.",
+      "wordPart": "word/styles.xml",
+      "detail": {
+        "styleId": "MDPPCalloutWarning",
+        "styleName": "MDPP Callout Warning",
+        "className": "word-style-mdpp-callout-warning"
+      }
+    },
+    {
+      "code": "MDPP0700",
+      "severity": "warning",
+      "message": "Merged Word table cells were normalized to Markdown table rows; exact merge geometry was not preserved.",
+      "wordPart": "word/document.xml"
+    },
+    {
+      "code": "MDPP0701",
+      "severity": "info",
+      "message": "Source style 'caption' was converted to md++ class '.word-style-caption'.",
+      "wordPart": "word/styles.xml",
+      "detail": {
+        "styleId": "Caption",
+        "styleName": "caption",
+        "className": "word-style-caption"
+      }
+    },
+    {
+      "code": "MDPP0700",
+      "severity": "warning",
+      "message": "Drawing without image relationship was skipped.",
+      "wordPart": "word/document.xml"
+    },
+    {
+      "code": "MDPP0700",
+      "severity": "warning",
+      "message": "Tracked deletion was omitted from the Markdown output.",
+      "wordPart": "word/document.xml",
+      "detail": {
+        "text": "tracked-old-mdpp-term"
+      }
+    },
+    {
+      "code": "MDPP0700",
+      "severity": "warning",
+      "message": "Tracked insertion was accepted into the Markdown output.",
+      "wordPart": "word/document.xml",
+      "detail": {
+        "text": "tracked-new-mdpp-term"
+      }
+    },
+    {
+      "code": "MDPP0702",
+      "severity": "info",
+      "message": "Imported 3 Word comments moved to sidecar metadata.",
+      "source": "mdpp_word_export_fixture.docx",
+      "wordPart": "word/comments.xml",
+      "detail": {
+        "count": 3
+      }
+    },
+    {
+      "code": "MDPP0704",
+      "severity": "warning",
+      "message": "Multiple Word section orientations were normalized to a single md++ layout orientation.",
+      "wordPart": "word/document.xml",
+      "detail": {
+        "orientations": [
+          "portrait",
+          "landscape"
+        ]
+      }
+    }
+  ]
+}

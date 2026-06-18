@@ -1,6 +1,6 @@
 # md++ Draft 0.14 Bundle
 
-This bundle contains the md++ language spec, reference runtime architecture, diagnostic catalog, artifact schema skeleton, reference implementation planning documents, and compliance-oriented source examples.
+This bundle contains the md++ language spec, reference runtime architecture, diagnostic catalog, artifact schema skeleton, Office import profile, reference implementation planning documents, and compliance-oriented source examples.
 
 ## Folder structure
 
@@ -12,6 +12,7 @@ MDPP/
     mdpp_language_spec_v0_14.md
     mdpp_reference_runtime_architecture_v0_14.md
     mdpp_diagnostic_catalog_v0_14.md
+    mdpp_office_import_profile_v0_15.md
   schemas/
     mdpp_artifact_schemas_v0_14.schema.json
   implementation/
@@ -32,13 +33,14 @@ MDPP/
 1. `specs/mdpp_language_spec_v0_14.md`
 2. `specs/mdpp_reference_runtime_architecture_v0_14.md`
 3. `specs/mdpp_diagnostic_catalog_v0_14.md`
-4. `schemas/mdpp_artifact_schemas_v0_14.schema.json`
-5. `implementation/mdpp_reference_plugin_catalog_v0_14.md`
-6. `implementation/mdpp_reference_components_v0_14.md`
-7. `implementation/mdpp_application_profiles_v0_14.md`
-8. `implementation/mdpp_implementation_roadmap_v0_14.md`
-9. `examples/README.md`
-10. `examples/SUITE_MANIFEST.md`
+4. `specs/mdpp_office_import_profile_v0_15.md`
+5. `schemas/mdpp_artifact_schemas_v0_14.schema.json`
+6. `implementation/mdpp_reference_plugin_catalog_v0_14.md`
+7. `implementation/mdpp_reference_components_v0_14.md`
+8. `implementation/mdpp_application_profiles_v0_14.md`
+9. `implementation/mdpp_implementation_roadmap_v0_14.md`
+10. `examples/README.md`
+11. `examples/SUITE_MANIFEST.md`
 
 ## Implementation targets
 
@@ -52,12 +54,12 @@ The implementation documents are organized around three targets:
 
 ## Office import and richer theme update
 
-The v0.14 draft bundle also includes an additive Office-normalization update:
+The bundle also includes an additive Office-normalization profile:
 
 - richer theme declarations for author-facing classes, components, and page furniture;
 - page-furniture conventions for headers, footers, and page numbers;
 - Office-like DOCX/PPTX normalization into text-editable md++;
-- sidecar guidance for imported comments and review metadata;
+- v0.15 sidecar naming guidance for imported comments, review metadata, and import diagnostics;
 - stable diagnostic codes for page furniture and lossy import cases;
 - compliance examples `71` through `77`.
 
