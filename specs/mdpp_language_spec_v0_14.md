@@ -1,19 +1,19 @@
 # md++ Language Specification
 
 [md:profile]: md++
-[md:profile-version]: 0.14
+[md:profile-version]: 0.15
 [md:title]: <md++ Language Specification>
 [md:status]: draft
 
-Status: draft 0.14  
+Status: draft 0.15  
 File type: Markdown-compatible extension profile  
 Canonical extension: `.md`
 
 This document defines the portable md++ Markdown-based authoring profile: syntax, author-visible semantics, rendering conventions, layouts, models, and diagnostics.
 
-Implementation architecture, provider APIs, typed runtime artifacts, workers, jobs, DOM patches, plugin lifecycle details, plugin manifests, and IPC/RPC details are defined separately in `mdpp_reference_runtime_architecture_v0_14.md`.
+Implementation architecture, provider APIs, typed runtime artifacts, workers, jobs, DOM patches, plugin lifecycle details, plugin manifests, and IPC/RPC details are defined separately in `mdpp_reference_runtime_architecture_v0_15.md`.
 
-Stable diagnostic codes are maintained separately in `mdpp_diagnostic_catalog_v0_14.md`.
+Stable diagnostic codes are maintained separately in `mdpp_diagnostic_catalog_v0_15.md`.
 
 Reference implementation plugin/component planning is maintained separately under `implementation/` in the release bundle.
 
@@ -23,6 +23,8 @@ Reference implementation plugin/component planning is maintained separately unde
 
 md++ is a Markdown-compatible authoring profile for documents as code.
 
+md++ targets repeatable, style-consistent technical documents. Authors should normally express structure and semantic intent in Markdown, while themes, formatting templates, layouts, and stylesheets apply consistent presentation.
+
 It keeps ordinary Markdown as the host language and adds a small set of conventions for:
 
 - document directives;
@@ -30,6 +32,7 @@ It keeps ordinary Markdown as the host language and adds a small set of conventi
 - resource references for plugins;
 - capability requirements;
 - theme resources;
+- formatting templates;
 - stylesheet resources;
 - layout resources;
 - syntax highlighting;
@@ -105,7 +108,9 @@ A processor MUST preserve repeated `md:` directives in source order, even when a
 | Repository | Named root used for includes and plugin resources |
 | Repository-qualified reference | Reference of the form `repository-name:path/inside/repository.ext` |
 | Repository-scoped requirement | Capability requirement whose capability is resolved in the context of a named repository |
-| Theme | Bundled presentation resource that may declare design tokens, layouts, and stylesheets |
+| Theme | Bundled presentation resource that may declare design tokens, formatting templates, layouts, and stylesheets |
+| Formatting template | Theme-owned rule set that assigns CSS-facing classes to elements in a section subtree |
+| Section semantic class | Heading class used as ordinary CSS class and, when matching presentation names, as a formatting-template and layout-area selector |
 | Layout | Resource that defines page, slide, canvas, grid, area, and flow structure |
 | Stylesheet | CSS or host-supported styling resource applied to rendered output |
 | Model block | Fenced block with a `model=...` instruction |
@@ -140,7 +145,7 @@ Example:
 
 ````markdown
 [md:profile]: md++
-[md:profile-version]: 0.14
+[md:profile-version]: 0.15
 [md:require]: diagram.mermaid
 [md:theme]: ./themes/company.theme.md
 [md:layout]: ./layouts/two-columns.layout.md
@@ -187,7 +192,7 @@ Portable md++ metadata is declared using `md:` link-reference directives:
 
 ```markdown
 [md:profile]: md++
-[md:profile-version]: 0.14
+[md:profile-version]: 0.15
 [md:title]: <md++ Specification>
 [md:status]: draft
 ```
@@ -294,7 +299,7 @@ Portable forms:
 Examples:
 
 ```markdown
-[md:require]: core@^0.14
+[md:require]: core@^0.15
 [md:require]: include
 [md:require]: diagram.mermaid@^10
 [md:require]: diagram.dot
@@ -611,15 +616,16 @@ There is no optional include syntax in the portable core profile. If an include 
 
 ---
 
-## 10. Themes, layouts, and stylesheets
+## 10. Themes, formatting templates, layouts, and stylesheets
 
-md++ separates presentation into three authoring levels:
+md++ separates presentation into authoring layers:
 
-| Level | Resource | Typical user | Purpose |
+| Layer | Source | Typical user | Purpose |
 |---|---|---|---|
-| Theme | `[md:theme]:` | Average author | Apply a complete presentation package |
-| Layout | `[md:layout]:` | Intermediate author | Control page, slide, and area structure |
-| Stylesheet | `[md:stylesheet]:` | Advanced author | Control exact CSS or host-specific styling |
+| Theme | `[md:theme]:` resource | Average author | Apply a complete presentation package |
+| Formatting template | Theme section | Theme author | Assign CSS-facing classes automatically from document structure |
+| Layout | `[md:layout]:` resource | Intermediate author | Control page, slide, canvas, area, and flow structure |
+| Stylesheet | `[md:stylesheet]:` resource | Advanced author | Control exact CSS styling |
 
 A document may use only a theme:
 
@@ -638,7 +644,7 @@ The theme directive declares a theme resource:
 [md:theme]: shared:themes/company.theme.md
 ```
 
-A theme resource is an md++ file parsed in theme context. It may contain design tokens and may declare layouts and stylesheets using normal md++ directives.
+A theme resource is an md++ file parsed in theme context. It may contain design tokens, formatting templates, component defaults, plugin defaults, assets, page furniture, and may declare layouts and stylesheets using normal md++ directives.
 
 Example:
 
@@ -646,11 +652,14 @@ Example:
 # Company Report Theme
 
 [md:profile]: md++
-[md:profile-version]: 0.14
+[md:profile-version]: 0.15
 [md:title]: <Company Report Theme>
 [md:layout]: ./report.layout.md
 [md:stylesheet]: ./base.css
 [md:stylesheet]: ./components.css
+
+## formatting
+default-template: standard
 
 ## colors
 primary: #204080
@@ -667,6 +676,24 @@ code: JetBrains Mono, monospace
 small: 4px
 medium: 12px
 large: 24px
+
+## formatting-template standard
+
+### rule first-section-paragraph
+match-type: paragraph
+match-position: first-of-section
+apply-class: mdpp-lead
+
+### rule ordinary-table
+match-type: table
+apply-class: mdpp-table
+
+## formatting-template api-reference
+
+### rule api-parameter-table
+match-type: table
+match-header-regex: ^Parameter\s*\|\s*Type\s*\|\s*Description
+apply-class: mdpp-api-table
 ```
 
 Recommended theme filenames end in:
@@ -677,16 +704,180 @@ Recommended theme filenames end in:
 
 A plain `.md` file may also be used as a theme resource when referenced by `[md:theme]:`. If its content cannot be interpreted as a theme, the host reports diagnostics.
 
+### Theme key/value declarations
+
+Theme declaration groups use Markdown headings. Within a theme declaration group, portable key/value declarations use this form:
+
+```text
+key: value
+```
+
+The key is the non-empty text before the first colon and MUST NOT contain whitespace. The value is the remainder of the line after the first colon, with leading and trailing whitespace removed.
+
+Values are strings until interpreted by the consuming theme, layout, stylesheet, plugin, or host property grammar. The `#` character, braces, commas, quotes, and additional colons inside the value have no special meaning in the core theme key/value syntax.
+
+Examples:
+
+```markdown
+primary: #204080
+body: Inter, sans-serif
+padding: 0 0 {spacing.medium} 0
+url: https://example.org/assets/logo.svg
+```
+
+Theme key/value declarations are not YAML. A portable processor MUST parse them using the md++ theme key/value rules, not a YAML parser.
+
 ### Theme contents
 
 A theme may provide:
 
 - design tokens such as colors, fonts, spacing, line weights, shadows, and palettes;
+- a default formatting template;
+- named formatting templates;
 - default layout references;
 - default stylesheet references;
+- component defaults;
 - plugin presentation defaults;
+- page furniture;
+- asset and font references.
 
-Theme vocabularies may evolve by profile and host. Portable themes should prefer simple headings and key/value declarations.
+Theme vocabularies may evolve by profile and host. Portable themes should prefer simple Markdown headings and md++ key/value declarations.
+
+### Formatting templates
+
+A formatting template is a named set of declarative rules that assigns CSS-facing classes to elements in the resolved md++ document tree.
+
+Formatting templates do not contain CSS and do not directly define visual properties. They classify document elements. Stylesheets define how the resulting classes look in HTML.
+
+A theme declares a default formatting template in the `## formatting` group:
+
+```markdown
+## formatting
+default-template: standard
+```
+
+If a theme declares a default template, that template applies to the root document and to every section that does not select another template.
+
+A theme declares a named template using a level-2 heading:
+
+```markdown
+## formatting-template NAME
+```
+
+The template name is matched exactly against heading classes. Recommended template names use the same syntax as portable class names: lowercase letters, digits, hyphens, and dots.
+
+#### Section semantic classes
+
+A class on a heading is a section semantic class.
+
+Example:
+
+```markdown
+## API Reference {.api-reference}
+```
+
+The same class has three presentation meanings:
+
+1. it remains an ordinary HTML/CSS class;
+2. if the active theme defines a formatting template with the same name, it selects that template for the section introduced by the heading;
+3. if the active layout defines an area with the same name, it binds the section to that layout area.
+
+No separate binding table is defined in the portable core profile. Matching is by exact class name.
+
+If a heading has more than one class and more than one class matches a formatting template, the first matching class in source order selects the template and the processor should report a diagnostic. If more than one class matches a layout area, the first matching class in source order selects the area and the processor should report a diagnostic.
+
+Classes that do not match a formatting template or layout area still remain ordinary HTML/CSS classes.
+
+#### Template scope
+
+A heading-selected formatting template applies to the section introduced by that heading, including nested subsections, until the next heading of the same or higher level closes the section.
+
+Example:
+
+```markdown
+## API Reference {.api-reference}
+
+Uses the `api-reference` template.
+
+### Endpoint A
+
+Still uses the `api-reference` template.
+
+## Design Notes
+
+Uses the inherited default template unless this heading selects another template.
+```
+
+A nested heading that selects another template replaces the inherited template for its own section subtree. Parent and child templates are not merged by default.
+
+#### Template rule syntax
+
+Inside a formatting template, each rule is declared with a level-3 heading:
+
+```markdown
+### rule NAME
+```
+
+The rule body is a set of md++ theme key/value declarations.
+
+Example:
+
+```markdown
+## formatting-template api-reference
+
+### rule api-parameter-table
+match-type: table
+match-header-regex: ^Parameter\s*\|\s*Type\s*\|\s*Description
+apply-class: mdpp-api-table
+
+### rule external-link
+match-type: link
+match-href-regex: ^https?://
+apply-class: mdpp-external-link
+```
+
+A rule may use these portable matching keys:
+
+| Key | Meaning |
+|---|---|
+| `match-type` | Element type to match |
+| `match-heading-level` | Heading level to match |
+| `match-position` | Position in the current section or container |
+| `match-after-type` | Previous sibling block type required for a match |
+| `match-before-type` | Next sibling block type required for a match |
+| `match-after-class` | Previous sibling class required for a match |
+| `match-before-class` | Next sibling class required for a match |
+| `match-after-rule` | Previous sibling block must have matched the named rule |
+| `match-text-regex` | ECMAScript-compatible regular expression matched against normalized text content |
+| `match-header-regex` | ECMAScript-compatible regular expression matched against a normalized table header signature |
+| `match-href-regex` | ECMAScript-compatible regular expression matched against link targets |
+| `match-class` | Existing class required for a match |
+| `match-area` | Active layout area required for a match |
+| `apply-class` | One or more whitespace-separated classes to add to the matched element |
+
+Portable `match-type` values are:
+
+```text
+heading, paragraph, list, list-item, quote, table, link, image, inline-code, code-block, fenced-block, thematic-break
+```
+
+Portable `match-position` values are:
+
+```text
+first, second, last, first-of-section, last-of-section, first-of-type, last-of-type, nth(N), nth-of-type(N)
+```
+
+Rule names are local to the formatting template. Duplicate rule names inside the same template are errors.
+
+Rules are evaluated in source order within the active template. A matched rule adds its `apply-class` value to the matched element. Adding the same class more than once has no effect.
+
+#### Formatting-template processing stage
+
+Formatting templates are applied after include resolution, repository resolution, theme resolution, and ordinary Markdown tree construction, and before HTML DOM generation.
+
+A processor should apply formatting templates to core Markdown elements. Plugin-owned rendered output participates in formatting-template matching only when the plugin or host exposes matching metadata compatible with the keys above.
+
+Formatting-template processing MUST NOT rewrite source content. It may add class metadata and diagnostics.
 
 ### Layout directive
 
@@ -728,11 +919,12 @@ Recommended precedence, from lowest to highest:
 1. host defaults;
 2. plugin defaults;
 3. theme design tokens and defaults;
-4. layouts referenced by the theme;
-5. stylesheets referenced by the theme;
-6. document-level `[md:layout]:` directives;
-7. document-level `[md:stylesheet]:` directives;
-8. document-local classes and attributes.
+4. theme formatting templates;
+5. layouts referenced by the theme;
+6. stylesheets referenced by the theme;
+7. document-level `[md:layout]:` directives;
+8. document-level `[md:stylesheet]:` directives;
+9. document-local classes and attributes.
 
 A document-level layout overrides the active layout selected by the theme for matching document sections. A document-level stylesheet is applied after theme stylesheets so it can refine or override them.
 
@@ -748,26 +940,31 @@ Here the theme supplies the general look. The document selects a more specific l
 
 ### Relationship to HTML and PDF
 
-md++ renders to an HTML document tree first. Themes, layouts, and stylesheets influence that tree and its CSS.
+md++ renders to an HTML document tree first. Themes, formatting templates, layouts, and stylesheets influence that tree and its CSS.
 
 For PDF-oriented output, the host may create page containers, layout areas, and pagination markers in the HTML DOM before conversion to PDF. CSS may style those pages and areas, while md++ flow rules tell the host how content continues between areas and generated pages.
 
 ### Presentation model and output consistency
 
-A host resolves themes, layouts, stylesheets, assets, and plugin defaults into a single presentation context.
+A host resolves themes, formatting templates, layouts, stylesheets, assets, page furniture, and plugin defaults into a single presentation context.
 
 The presentation context describes one canonical rendered document. HTML, PDF, print, image, and slide outputs should preserve that canonical result as much as possible.
 
-Output targets may require different host mechanics, such as pagination, print conversion, PDF generation, image export, or slide scaling. These mechanics should not change the author-visible design unless the document, theme, layout, stylesheet, or host extension explicitly requests it.
+Output targets may require different host mechanics, such as pagination, print conversion, PDF generation, image export, or slide scaling. These mechanics should not change the author-visible design unless the document, theme, formatting template, layout, stylesheet, plugin, or host extension explicitly requests it.
 
 #### Presentation context
 
 The resolved presentation context contains:
 
 - theme tokens;
+- formatting templates;
+- active formatting-template state for document sections;
+- formatting-template class assignments;
 - asset references;
+- page furniture definitions;
 - active layout resources;
 - stylesheet resources;
+- component defaults;
 - plugin presentation defaults;
 - output mechanics selected by the host;
 - diagnostics.
@@ -776,7 +973,7 @@ Presentation resources are resolved through the same repository and relative-res
 
 #### Theme tokens
 
-A theme may define named design tokens using Markdown headings and key/value declarations.
+A theme may define named design tokens using Markdown headings and md++ key/value declarations.
 
 Recommended token groups are:
 
@@ -866,6 +1063,21 @@ Examples:
 
 If the host renders a single md++ document into an isolated HTML document, it may expose the same variables on `:root`.
 
+#### Theme-provided component defaults
+
+Themes may provide defaults for common renderer or document components.
+
+Recommended syntax:
+
+```markdown
+## component table
+border: 1px solid {colors.text}
+header-background: {colors.primary}
+header-color: white
+```
+
+Component defaults are advisory. A renderer may ignore unsupported keys and should report diagnostics for invalid values when practical.
+
 #### Theme-provided plugin defaults
 
 Themes may provide defaults for plugin-owned rendering.
@@ -911,11 +1123,11 @@ A document may declare multiple themes.
 
 Themes are resolved in source order.
 
-Later themes override earlier token values and plugin defaults with the same names.
+Later themes override earlier token values, formatting templates with the same names, component defaults, and plugin defaults with the same names.
 
 Layouts and stylesheets declared by themes are accumulated in source order unless a later resource explicitly replaces a named layout.
 
-A host should report diagnostics when multiple themes define incompatible layout names, unsupported token values, or conflicting asset declarations.
+A host should report diagnostics when multiple themes define incompatible layout names, unsupported token values, duplicate formatting-template rule names, or conflicting asset declarations.
 
 #### Layout styling and theme tokens
 
@@ -954,7 +1166,7 @@ Layouts should not contain arbitrary CSS. Advanced visual styling belongs in sty
 
 #### Stylesheet scoping and sanitization
 
-Stylesheets are applied after theme and layout resolution.
+Stylesheets are applied after theme, formatting-template, and layout resolution.
 
 For portable HTML output, hosts should scope stylesheet effects to the md++ document container.
 
@@ -973,7 +1185,7 @@ Remote stylesheets, font URLs, imports, scripts, and external resource reference
 
 Portable md++ presentation should not define separate visual designs for screen, print, PDF, slide, or image output.
 
-The same resolved theme, layout, stylesheet cascade, token set, asset set, plugin defaults, page geometry, named areas, and flow rules should be used for all output targets unless a host-specific extension says otherwise.
+The same resolved theme, formatting-template cascade, layout, stylesheet cascade, token set, asset set, plugin defaults, page geometry, named areas, and flow rules should be used for all output targets unless a host-specific extension says otherwise.
 
 Output targets may differ in mechanics:
 
@@ -985,7 +1197,7 @@ Output targets may differ in mechanics:
 | PDF conversion | Host |
 | Print conversion | Host |
 | Slide scaling or image export | Host |
-| Visual design | Theme, layout, stylesheet, plugins |
+| Visual design | Theme, formatting template, layout, stylesheet, plugins |
 
 Output-specific stylesheets and output-specific theme variants are not part of the portable md++ core profile.
 
@@ -1014,6 +1226,34 @@ The host decides whether assets are embedded, copied, linked, substituted, or re
 
 Fonts should be exposed to renderers and stylesheets when allowed by host policy and font licensing.
 
+#### Page furniture
+
+Page furniture is repeated page-level generated content such as headers, footers, page numbers, and report metadata.
+
+Themes may define named page-furniture profiles:
+
+```markdown
+## page-furniture report
+header-left: {document.title}
+header-right: {page.number}
+footer-center: Confidential
+number-format: {page.number} / {page.count}
+first-page: same
+```
+
+Portable slots are:
+
+| Slot | Meaning |
+|---|---|
+| `header-left`, `header-center`, `header-right` | Header content |
+| `footer-left`, `footer-center`, `footer-right` | Footer content |
+| `number-format` | Page-number text pattern |
+| `first-page` | `same`, `different`, or `none` |
+
+Portable generated values are `{document.title}`, `{document.status}`, `{section.title}`, `{page.number}`, and `{page.count}`. Page numbers and counts are resolved after pagination. If `{page.count}` is unavailable for streaming or interactive output, the host should leave it empty or use a documented placeholder and report a diagnostic.
+
+Layouts may select a page-furniture profile by name when the layout grammar defines such a property.
+
 #### Presentation diagnostics
 
 Hosts should report diagnostics for unusable presentation resources.
@@ -1027,6 +1267,13 @@ Recommended diagnostics include:
 | Unknown token group | warning |
 | Invalid token value | warning or error |
 | Duplicate token overridden by later theme | info or warning |
+| Missing default formatting template | error |
+| Duplicate formatting template rule name | error |
+| Invalid formatting template rule | error |
+| Unknown formatting template selected by heading class | warning or error |
+| Multiple heading classes match formatting templates | warning |
+| Multiple heading classes match layout areas | warning |
+| Invalid regular expression in formatting template | error |
 | Missing layout referenced by theme | error |
 | Invalid layout resource | error |
 | Missing stylesheet resource | error |
@@ -1034,6 +1281,7 @@ Recommended diagnostics include:
 | Unsafe CSS feature rejected | warning or error |
 | Missing theme asset | warning or error |
 | Font asset rejected or unavailable | warning |
+| Component default rejected by renderer | warning |
 | Plugin default rejected by plugin | warning |
 | Token reference cannot be resolved | error |
 | Layout property cannot use resolved token value | error |
@@ -1071,9 +1319,13 @@ Examples:
 Meaning:
 
 - `#architecture` defines an explicit anchor;
-- `.layout-two-columns` selects a layout when it matches a declared layout name;
+- any `.class-name` is applied as a class to the rendered HTML element, in the same spirit as HTML/CSS classes;
+- a class on a heading is also a section semantic class;
+- `.layout-two-columns` may select a layout when it matches a declared layout name;
 - `.left` and `.right` bind content to layout areas when they match area names in the active layout;
-- any `.class-name` is also applied as a class to the rendered HTML element, in the same spirit as HTML/CSS classes.
+- a heading class selects a formatting template when the active theme defines a template with the same name.
+
+The same heading class may therefore select CSS styling, a formatting template, and a layout position by exact name.
 
 Explicit anchors should be unique in the resolved document.
 
@@ -1375,7 +1627,7 @@ md++ renderers should produce predictable HTML for core Markdown constructs so t
 The rendered document should have one root container:
 
 ```html
-<article class="mdpp-document" data-md-profile="md++" data-md-profile-version="0.14">
+<article class="mdpp-document" data-md-profile="md++" data-md-profile-version="0.15">
   ...
 </article>
 ```
@@ -1406,6 +1658,8 @@ For ordinary Markdown content that has no explicit attribute list, the host shou
 | Raw HTML block, when allowed | host-sanitized HTML | `.mdpp-html-block` on a containing element when wrapping is needed |
 
 A host should preserve explicit anchors, classes, and key/value attributes from attribute-list syntax on the corresponding rendered element when policy allows. Host-generated ids should be stable for a given resolved document.
+
+When a host emits section container elements, it should preserve heading section semantic classes on the generated section container as well as on the heading element. This gives stylesheets and layout processors a stable section-level hook.
 
 A portable stylesheet should not depend on host-private wrapper elements, generated measurement nodes, or plugin-internal DOM unless those elements are documented by the host or plugin.
 
@@ -1793,12 +2047,12 @@ Meaning:
 |---|---|
 | `#` | Document/deck title |
 | `##` | Page or slide section |
-| `###` | Named layout area |
+| `###` | Named layout area or styled subsection |
 | `####` | Item inside an area renderer |
 
-The convention may be interpreted by a host, renderer, or layout plugin.
+The convention may be interpreted by a host, renderer, layout plugin, or formatting-template processor.
 
-This section is an authoring convention, not a mandatory portable page-building algorithm. The exact logic that maps headings, classes, attributes, and child blocks into page containers and named areas is determined by the active layout interpretation plugin, area renderer, and host rendering policy. A renderer may treat the `##` heading as a page title, place it into a `title` area, render it as ordinary content, or use another documented rule. Likewise, `###` headings are commonly used to introduce named areas, but area-local renderers decide how their child sections are interpreted.
+This section is an authoring convention, not a mandatory portable page-building algorithm. The exact logic that maps headings, classes, attributes, and child blocks into page containers and named areas is determined by the active layout interpretation plugin, area renderer, formatting template, and host rendering policy. A renderer may treat the `##` heading as a page title, place it into a `title` area, render it as ordinary content, or use another documented rule. Likewise, `###` headings are commonly used to introduce named areas, but area-local renderers decide how their child sections are interpreted.
 
 ---
 
@@ -1808,7 +2062,7 @@ This section is an authoring convention, not a mandatory portable page-building 
 
 ````markdown
 [md:profile]: md++
-[md:profile-version]: 0.14
+[md:profile-version]: 0.15
 [md:title]: <Architecture Roadmap>
 
 [md:require]: include
@@ -1875,11 +2129,14 @@ A simple formula: $E = mc^2$.
 # Company Theme
 
 [md:profile]: md++
-[md:profile-version]: 0.14
+[md:profile-version]: 0.15
 [md:title]: <Company Theme>
 [md:layout]: ./two-columns.layout.md
 [md:stylesheet]: ./company.css
 [md:stylesheet]: ./components.css
+
+## formatting
+default-template: standard
 
 ## colors
 primary: #204080
@@ -1896,6 +2153,27 @@ code: JetBrains Mono, monospace
 small: 4px
 medium: 12px
 large: 24px
+
+## formatting-template standard
+
+### rule first-section-paragraph
+match-type: paragraph
+match-position: first-of-section
+apply-class: mdpp-lead
+
+## formatting-template summary
+
+### rule first-list
+match-type: list
+match-position: first-of-section
+apply-class: mdpp-summary-list
+
+## formatting-template sequence
+
+### rule step-heading
+match-type: heading
+match-heading-level: 4
+apply-class: mdpp-sequence-step
 ```
 
 ### Layout resource
@@ -1928,7 +2206,7 @@ right:
 
 ## 20. Diagnostics
 
-Stable diagnostic codes are maintained in `mdpp_diagnostic_catalog_v0_14.md`. This language specification defines diagnostic situations and recommended severity; the separate catalog assigns maintainable codes for processors, editors, tests, and reports.
+Stable diagnostic codes are maintained in `mdpp_diagnostic_catalog_v0_15.md`. This language specification defines diagnostic situations and recommended severity; the separate catalog assigns maintainable codes for processors, editors, tests, and reports.
 
 A processor SHOULD produce diagnostics for:
 
@@ -1949,6 +2227,12 @@ A processor SHOULD produce diagnostics for:
 | Duplicate model name | error |
 | Unknown layout | error |
 | Unknown area class in page/slide source | warning or error |
+| Missing default formatting template | error |
+| Invalid formatting template rule | error |
+| Duplicate formatting template rule name | error |
+| Multiple heading classes match formatting templates | warning |
+| Multiple heading classes match layout areas | warning |
+| Invalid regular expression in formatting template | error |
 | Area declaration for missing grid area | error |
 | Non-rectangular repeated grid area | error |
 | Invalid track size | error |
@@ -1976,115 +2260,3 @@ line: 42
 layout: "layout-two-columns"
 area: "right"
 ```
-
-<!-- BEGIN mdpp-office-pipeline-update-v0-14: language -->
-
-## Appendix: Office import, richer theme resources, and page furniture
-
-This appendix records the v0.14 draft update for lossy Office-like import, richer theme files, style classes, component declarations, and page furniture. It is deliberately written as an additive section so it can be applied safely to existing draft repositories and later folded into the numbered chapters.
-
-### Richer theme resources
-
-Theme files remain Markdown resources. A portable theme may use Markdown headings as declaration groups and key/value declarations inside each group.
-
-Recommended heading forms:
-
-```markdown
-## colors
-primary: #204080
-accent: #f0a000
-
-## fonts
-body: Aptos, Arial, sans-serif
-heading: Aptos Display, Aptos, sans-serif
-
-## spacing
-small: 0.25rem
-medium: 0.75rem
-large: 1.5rem
-
-## class lead
-font-size: 1.15em
-line-height: 1.45
-
-## class callout-warning
-background: #fff6db
-border-color: {{colors.accent}}
-padding: {{spacing.medium}}
-
-## component table
-border: 1px solid {{colors.border}}
-header-background: {{colors.primary}}
-header-color: white
-
-## page-furniture report
-header-left: {{document.title}}
-header-right: {{page.number}}
-footer-center: Confidential
-number-format: {{page.number}} / {{page.count}}
-```
-
-The portable heading kinds are:
-
-| Heading form | Meaning |
-|---|---|
-| `## colors`, `## fonts`, `## spacing`, and similar token groups | Design token groups |
-| `## class NAME` | Visual treatment for author-facing class `.NAME` |
-| `## component NAME` | Defaults for common renderer/document components |
-| `## page-furniture NAME` | Reusable header, footer, and page-numbering defaults |
-| `## plugin NAME` | Defaults for a plugin-owned renderer |
-| `## assets` and `## font-assets` | Theme-owned resource references |
-
-The theme vocabulary is a convenience layer above CSS. Theme declarations should cover common document-design intent. CSS remains the escape hatch for selectors, pseudo-elements, media queries, animations, advanced print behavior, and host-specific output features.
-
-### Style classes
-
-Attribute-list classes such as `{.lead}` or `{.callout-warning}` are portable author-facing style classes. A Word or PowerPoint importer should map safe named source styles to classes rather than embedding source application style objects in the body.
-
-Example:
-
-```markdown
-# Imported report {{.word-style-title}}
-
-This paragraph came from a Word style named "Executive Summary". {{.word-style-executive-summary}}
-```
-
-Theme and stylesheet resources define what these classes mean visually. Unknown classes should remain in the Markdown and may produce diagnostics only when a selected profile requires class declarations.
-
-### Page furniture
-
-Page furniture is repeated page-level generated content such as headers, footers, page numbers, and report metadata. Layouts may select a page-furniture profile by name. Themes define the profile.
-
-Portable slots are:
-
-| Slot | Meaning |
-|---|---|
-| `header-left`, `header-center`, `header-right` | Header content |
-| `footer-left`, `footer-center`, `footer-right` | Footer content |
-| `number-format` | Page-number text pattern |
-| `first-page` | `same`, `different`, or `none` |
-
-Portable generated values are `{document.title}`, `{document.status}`, `{section.title}`, `{page.number}`, and `{page.count}`. Page numbers and counts are resolved after pagination. If `{page.count}` is unavailable for streaming or interactive output, the host should leave it empty or use a documented placeholder and report `MDPP0418`.
-
-### Office-like import and sidecar metadata
-
-md++ may be used as a semantic normalization target for DOCX, PPTX, or similar visual office formats. Import is intentionally lossy.
-
-Recommended mapping:
-
-| Office-like source feature | md++ target |
-|---|---|
-| Body paragraphs | Markdown paragraphs with style classes when useful |
-| Heading styles | Markdown headings |
-| Named paragraph/character styles | Attribute-list classes |
-| Tables | Markdown tables when simple; plugin/component blocks when complex |
-| Images | Asset files referenced by Markdown images |
-| Headers, footers, page numbers | Theme/layout page furniture |
-| Comments, review notes, speaker notes | Sidecar metadata |
-| Unrepresentable freeform layout, SmartArt, charts, embedded objects, macros | Static asset, placeholder, omission, or diagnostic |
-
-Comments and review notes should normally be stored outside the md++ body in a sidecar file such as `root.md.comments.yaml` or `root.md.comments.json`. Targets should prefer explicit anchors when available and may fall back to source-origin ranges or generated block identifiers.
-
-Importers should emit diagnostics from the `MDPP0700` range for unsupported or degraded source features.
-
-<!-- END mdpp-office-pipeline-update-v0-14: language -->
