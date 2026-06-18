@@ -45,9 +45,9 @@ css-class: .word-image
 
 ## page-furniture word-report
 
-header-left: ""
-header-center: ""
+header-left: "md++ Word Export Fixture - first page header differs from later pages"
+header-center: "md++ Word Export Fixture | {document.title}"
 header-right: ""
 footer-left: ""
-footer-center: "Page {page.number} of {page.count}"
+footer-center: "Confidential fixture | Page {page.number} of {page.count}"
 footer-right: ""
