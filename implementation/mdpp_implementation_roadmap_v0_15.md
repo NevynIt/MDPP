@@ -18,7 +18,7 @@ Goal: make the specs testable before large implementation work.
 
 Deliverables:
 
-- sample md++ files for directives, includes, repositories, requirements, fenced blocks, models, themes, layouts, and diagnostics;
+- sample md++ files for directives, includes, repositories, requirements, fenced blocks, inline and external models, themes, layouts, and diagnostics;
 - expected diagnostic JSON files;
 - expected dependency lists;
 - minimal expected HTML snapshots;
@@ -46,13 +46,14 @@ Deliverables:
 - repository core;
 - file and memory repository providers;
 - fenced block info-string parser;
+- external model directive parsing and resource resolution;
 - model registry skeleton;
 - diagnostics aggregation.
 
 Exit criteria:
 
 - nested includes work across relative paths and repositories;
-- duplicate model and repository errors are detected;
+- duplicate inline/external model and repository errors are detected;
 - requirement syntax is parsed consistently;
 - source origins are preserved.
 
@@ -99,6 +100,7 @@ Deliverables:
 Exit criteria:
 
 - model blocks are absorbed when parsed successfully;
+- external model directives register resources without producing body output;
 - plugin-owned render blocks can consume models;
 - missing capabilities and dispatch conflicts produce diagnostics.
 

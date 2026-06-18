@@ -93,6 +93,7 @@ Responsibilities:
 - identify `md:` labels;
 - collect repeated directives;
 - parse profile, metadata, include, repository, theme, layout, stylesheet, and require directives;
+- parse external model directive labels and destinations;
 - return structured diagnostics for invalid directive syntax.
 
 ### 3.3. `@mdpp/requirements`
@@ -116,6 +117,7 @@ Responsibilities:
 - parse block type;
 - parse `key=value`, quoted values, and flags;
 - preserve source ranges for attributes;
+- support reuse for external model directive titles;
 - report invalid forms.
 
 ---
@@ -247,6 +249,7 @@ Responsibilities:
 - root source ingestion;
 - include resolution;
 - repository table construction;
+- external model resource resolution;
 - model block absorption;
 - plugin dispatch;
 - diagnostics aggregation;
@@ -260,7 +263,7 @@ Owns resolved models.
 Responsibilities:
 
 - enforce unique model names;
-- preserve model origins;
+- preserve inline model origins and external model directive/resource origins;
 - expose model summaries and full model data;
 - track model diagnostics;
 - support invalidation and update.

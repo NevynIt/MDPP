@@ -30,6 +30,7 @@ This manifest turns the language spec, diagnostic catalog, and compliance scenar
 - Duplicate model: `MDPP0301`
 - Model parse failure: `MDPP0302`
 - Plugin render failure or missing model render target: `MDPP0304`
+- External model directive/info/parser issues: `MDPP0305`, `MDPP0306`, `MDPP0307`, `MDPP0308`, `MDPP0309`
 - Invalid stylesheet/theme/layout: `MDPP0400`, `MDPP0401`, `MDPP0402`
 - Unknown layout or area class: `MDPP0403`, `MDPP0404`
 - Area declaration for missing grid area: `MDPP0405`
@@ -117,7 +118,7 @@ This manifest turns the language spec, diagnostic catalog, and compliance scenar
 | 67 | `67-unsupported-area-renderer` | Reports an area renderer unavailable in the proof environment. | MDPP0411 |
 | 68 | `68-plugin-defaults-from-theme` | Passes theme-provided defaults to the DOT render plugin. | none |
 | 69 | `69-block-attributes-override-plugin-defaults` | Uses block attributes to override theme-provided plugin defaults. | none |
-| 70 | `70-complete-minimal-document` | Resolves the integrated document: requirements, repository, theme, layout, stylesheet, include, math, Mermaid, DOT model, DOT render, and page layout. | none |
+| 70 | `70-complete-minimal-document` | Resolves the integrated document: requirements, repository, theme, layout, stylesheet, include, math, Mermaid, external DOT model, DOT render, and page layout. | none |
 | 71 | `71-theme-class-declarations` | Applies theme-defined class declarations to author-facing classes. | none |
 | 72 | `72-theme-component-declarations` | Applies theme-defined component defaults to tables and figures. | none |
 | 73 | `73-page-furniture-report-layout` | Applies layout-selected report page furniture for headers, footers, and page numbers. | none |
@@ -126,3 +127,11 @@ This manifest turns the language spec, diagnostic catalog, and compliance scenar
 | 76 | `76-office-comments-sidecar` | Keeps imported comments in a sidecar file targeted at anchors in the main document. | MDPP0702 |
 | 77 | `77-lossy-office-import-diagnostics` | Reports lossy import cases for freeform positioning, embedded objects, and precise pagination. | MDPP0700, MDPP0703, MDPP0704 |
 | 78 | `78-theme-include-composition` | Resolves theme-level includes in theme context and applies included tokens, formatting templates, and plugin defaults at the include positions. | none |
+| 79 | `79-external-model-resource` | Registers a DOT model from a repository-qualified external resource and renders it through `diagram.dot.render`. | none |
+| 80 | `80-invalid-external-model-directive` | Reports an external model directive whose title tries to supply `model=...`. | MDPP0305 |
+| 81 | `81-invalid-external-model-info-string` | Reports malformed info-string syntax in an external model directive title. | MDPP0306 |
+| 82 | `82-unsupported-external-model-parser` | Reports an external model parser selector that no proof parser claims. | MDPP0307 |
+| 83 | `83-external-model-selection-failed` | Reports failed parser selection when an external model directive has no title and no useful resource metadata. | MDPP0308 |
+| 84 | `84-external-model-parse-failure` | Reports parse failure after resolving an external DOT model resource. | MDPP0309 |
+| 85 | `85-duplicate-external-model-name` | Reports a duplicate model name across an external model directive and an inline model block. | MDPP0301 |
+| 86 | `86-missing-external-model-resource` | Reports that an external model resource cannot be fetched. | MDPP0207 |

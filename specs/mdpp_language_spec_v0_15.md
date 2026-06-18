@@ -39,6 +39,7 @@ It keeps ordinary Markdown as the host language and adds a small set of conventi
 - math formulas;
 - renderable diagrams;
 - named model blocks;
+- external model resources;
 - plugin-owned rendering blocks;
 - page and slide layouts;
 - named layout areas;
@@ -53,7 +54,7 @@ A plain Markdown renderer should still show useful content. md++ processors add 
 
 The base Markdown standard for portable md++ documents is GitHub Flavored Markdown (GFM), including the CommonMark core syntax and the GFM table extension. A conforming md++ processor MUST parse ordinary Markdown constructs according to GFM before applying md++ interpretation.
 
-The md++ language profile adds directives, fenced-block attributes, model registration, repository-qualified references, layout resources, and presentation conventions on top of GFM. It does not redefine ordinary Markdown paragraphs, headings, emphasis, links, images, lists, block quotes, code blocks, or tables.
+The md++ language profile adds directives, fenced-block attributes, model registration, external model resources, repository-qualified references, layout resources, and presentation conventions on top of GFM. It does not redefine ordinary Markdown paragraphs, headings, emphasis, links, images, lists, block quotes, code blocks, or tables.
 
 The capitalized words MUST, MUST NOT, REQUIRED, SHOULD, SHOULD NOT, RECOMMENDED, MAY, and OPTIONAL are normative when they appear in this specification. Lowercase uses of those words are ordinary prose.
 
@@ -87,7 +88,7 @@ A processor MUST preserve repeated `md:` directives in source order, even when a
    Diagrams, models, data blocks, and plugin rendering requests use fenced code blocks with info strings.
 
 5. **Model definition and rendering are separate**  
-   A fenced block with `model=...` defines reusable content. Rendering happens through ordinary block processing, delegated to plugins.
+   A fenced block with `model=...` or an external model directive defines reusable content. Rendering happens through ordinary block processing, delegated to plugins.
 
 6. **Plugins own specialized behavior**  
    md++ core recognizes syntax and dispatch points. Plugins define how to parse, validate, render, or otherwise process specialized content types.
@@ -114,7 +115,9 @@ A processor MUST preserve repeated `md:` directives in source order, even when a
 | Layout | Resource that defines page, slide, canvas, grid, area, and flow structure |
 | Stylesheet | CSS or host-supported styling resource applied to rendered output |
 | Model block | Fenced block with a `model=...` instruction |
-| Model repository | Resolved set of named models in the document, including included files |
+| External model directive | Document-level directive of the form `[md:model:NAME]: RESOURCE ["INFO-STRING"]` that registers a model from an external resource |
+| Parser selector | First token of a fenced block info string, used to select the parser, plugin entry point, or pipeline for a model or plugin-owned block |
+| Model repository | Resolved set of named models in the document, including included files and external model resources |
 | Plugin-owned block | Fenced block whose processing is owned by a plugin |
 | Normal processing | Whatever the host would do with a block without md++ model absorption |
 | Layout area | Named rectangular region in a page or slide layout |
@@ -139,7 +142,7 @@ print("hello")
 ```
 ````
 
-md++ adds interpretation for directives, fenced block attributes, model registration, plugin dispatch, layout declarations, and area flow.
+md++ adds interpretation for directives, fenced block attributes, model registration, external model resources, plugin dispatch, layout declarations, and area flow.
 
 Example:
 
@@ -235,6 +238,7 @@ Examples:
 [md:require]: diagram.mermaid ">=10 <11"
 [md:include]: ./sections/overview.md
 [md:include]: <./sections/overview with spaces.md>
+[md:model:system-graph]: shared:models/system.dot "dot"
 [md:theme]: ./themes/company.theme.md
 [md:stylesheet]: ./styles/default.css
 [md:layout]: ./layouts/report.layout.md
@@ -268,6 +272,7 @@ The core directives defined in this draft are:
 | `[md:status]:` | Declares document status metadata |
 | `[md:require]:` | Declares a required capability |
 | `[md:include]:` | Includes or composes another Markdown-compatible file |
+| `[md:model:*]:` | Registers a named model from an external resource |
 | `[md:repository:*]:` | Defines a named include and resource root |
 | `[md:theme]:` | Declares a theme resource |
 | `[md:stylesheet]:` | Declares a stylesheet resource |
@@ -499,7 +504,7 @@ Relative references inside an included file are resolved relative to that includ
 Directive scope after include resolution:
 
 - `[md:require]:` directives from included files are accumulated into the including document's resolved capability requirements in resolved source order.
-- model blocks from included files are accumulated into the including document's resolved model repository.
+- model blocks and `[md:model:*]:` external model directives from included files are accumulated into the including document's resolved model repository.
 - `[md:repository:*]:` directives from the root document and included files contribute to one global repository table for the resolved document. Repository names are global within the resolved document.
 - `[md:title]:`, `[md:status]:`, and other document metadata directives in included files describe the included source file only. They do not override root document metadata in the portable core profile.
 - `[md:theme]:`, `[md:layout]:`, and `[md:stylesheet]:` directives from included files participate in the resolved presentation context in resolved source order unless the host parses the included file in a non-document resource context.
@@ -542,6 +547,7 @@ Examples:
 
 ```markdown
 [md:include]: shared:chapters/intro.md
+[md:model:system-graph]: shared:models/system.dot "dot"
 [md:layout]: shared:layouts/report.layout.md
 [md:theme]: shared:themes/company.theme.md
 [md:stylesheet]: shared:styles/default.css
@@ -582,6 +588,8 @@ then `./details.md` resolves to `shared:chapters/details.md`, and `../styles/cha
 
 ### Plugin resource references
 
+External model resources and plugin-requested resources use the same reference resolution rules as includes, themes, layouts, and stylesheets.
+
 A plugin may request a resource using the same repository-qualified reference form:
 
 ```text
@@ -595,7 +603,9 @@ shared:icons/database.svg
 corporate:themes/company.theme.md
 ```
 
-Relative resource requests should be resolved against the source file that contains the requesting block, unless the plugin or host defines a more specific base.
+Relative resource requests should be resolved against the source file that contains the requesting directive or block, unless the plugin or host defines a more specific base.
+
+For `[md:model:*]:` directives, the resource reference is resolved against the source file that contains the directive unless the reference is repository-qualified or absolute.
 
 Plugins should not fetch external resources directly in portable md++ processing. Plugins ask the host for a resource, and the host either provides it or returns a diagnostic according to host policy.
 
@@ -612,7 +622,10 @@ Processors should report diagnostics for:
 - unavailable repository providers;
 - inaccessible resources;
 - resource requests denied by policy;
-- duplicate model names after include resolution.
+- invalid external model directives;
+- invalid external model info strings;
+- unsupported external model parser selectors;
+- duplicate model names after include and external model resolution.
 
 There is no optional include syntax in the portable core profile. If an include cannot be resolved or read, the processor should report a warning and continue processing the rest of the source document when practical.
 
@@ -1538,9 +1551,11 @@ The canonical fence name is `dot`.
 
 ---
 
-## 16. Model blocks
+## 16. Models
 
-### 16.1 Syntax
+Models may be declared inline with fenced model blocks or loaded from external resources with document-level model directives. Both forms register named models in the same resolved model repository.
+
+### 16.1 Fenced model block syntax
 
 Any fenced block may become a model block by adding `model=NAME` to the info string:
 
@@ -1565,7 +1580,66 @@ replicas: 3
 ```
 ````
 
-### 16.2 Model name rules
+The first token of the fenced block info string is the parser selector. It uses the same grammar as other fenced block info strings defined in section 14.
+
+### 16.2 External model directive syntax
+
+A document may register a model from an external resource using `[md:model:NAME]:`:
+
+```markdown
+[md:model:NAME]: RESOURCE
+[md:model:NAME]: RESOURCE "INFO-STRING"
+```
+
+The directive label suffix `NAME` is the model name. The directive destination `RESOURCE` is a relative, absolute, or repository-qualified resource reference resolved using the normal md++ reference resolution rules.
+
+The optional Markdown title is an info string parsed with the same grammar as a fenced block info string. The first token is the parser selector. Remaining tokens are parser attributes. The external resource content is treated as the fenced block payload.
+
+Examples:
+
+```markdown
+[md:model:system-graph]: shared:models/system.dot "dot"
+[md:model:deployment-config]: ./models/deployment.yaml "yaml schema=deployment-v1"
+[md:model:api-schema]: api:schemas/openapi.json "openapi version=3 strict"
+[md:model:catalog]: repo:data/catalog.csv "csv delimiter=',' header"
+```
+
+This directive:
+
+```markdown
+[md:model:system-graph]: shared:models/system.dot "dot k1=v1 k2='v2 long'"
+```
+
+is equivalent, for model registration, to fetching `shared:models/system.dot` and processing its contents as if they were written as:
+
+````markdown
+```dot model=system-graph k1=v1 k2='v2 long'
+<contents of shared:models/system.dot>
+```
+````
+
+The directive itself produces no rendered document content. A successfully registered external model is absorbed into the resolved model repository in the same way as a successfully registered fenced model block.
+
+The directive title SHOULD use single-quoted attribute values inside the info string when an attribute value contains spaces. This avoids conflicts with the surrounding Markdown title delimiters. Hosts may support ordinary Markdown title escaping, but portable documents should prefer the form shown above.
+
+An external model directive's info string MUST NOT contain `model=...`. The model name is supplied only by the directive label. If `model=...` appears in the directive title, the processor MUST report an invalid external model directive diagnostic.
+
+### 16.3 External model parser selection
+
+If an external model directive has an info-string title, the processor MUST parse that title as a fenced block info string. Candidate model parsers are restricted to plugins, parser services, or pipelines that claim the parser selector in the first token.
+
+If an external model directive has no info-string title, the processor selects a model parser using available resource metadata and host policy. The selection should consider, in order where possible:
+
+1. content type provided by the repository or resource provider;
+2. file extension or resource naming convention;
+3. declared capability requirements, including repository-scoped requirements;
+4. repository context;
+5. source order, include order, or import logic used by the host;
+6. plugin or pipeline priority as a tie-breaker.
+
+A parser may still reject a resource after inspection. If the best candidate cannot parse the resource, the host may try the next compatible candidate when doing so is consistent with its parser-selection policy. Failed parser selection or failed parsing should produce diagnostics.
+
+### 16.4 Model name rules
 
 Recommended model names:
 
@@ -1573,37 +1647,52 @@ Recommended model names:
 [A-Za-z][A-Za-z0-9_.-]*
 ```
 
-Model names are unique in the resolved document, regardless of language.
+Model names are unique in the resolved document, regardless of language, parser selector, source file, or external resource.
 
 Duplicate model names are always errors. md++ does not allow model overlays, replacements, shadowing, or last-writer-wins behavior in the portable core profile.
 
-### 16.3 Resolved model repository
+### 16.5 Resolved model repository
 
 The model repository contains all successfully registered models from:
 
 - the root md++ document;
 - documents brought in through `[md:include]:`;
-- included files loaded through repository-qualified references.
+- included files loaded through repository-qualified references;
+- external resources loaded through `[md:model:*]:` directives.
 
 The host exposes this resolved model repository to plugins while they parse and render their own blocks.
 
 A plugin should be able to inspect model metadata such as:
 
 - model name;
-- source language;
-- source location;
+- parser selector, source language, or pipeline name;
+- directive source location for external models;
+- resource origin for external models;
+- source location for inline models;
 - parsed representation, when available;
-- original source text, when policy allows;
+- original source text or resource content, when policy allows;
 - diagnostics associated with the model.
 
-### 16.4 Absorption rule
+External model diagnostics should preserve both origins when available: the directive location that declared the model and the resource location that supplied the content.
+
+### 16.6 Absorption rule
 
 For a fenced block with `model=NAME`:
 
-1. If the host has a model plugin for the block language, the block is parsed and registered as model `NAME` in the model repository.
+1. If the host has a model plugin for the parser selector, the block is parsed and registered as model `NAME` in the model repository.
 2. If registration succeeds, the block is absorbed and removed from normal rendering.
 3. If the host processes the block through normal rendering, any renderer for that block type may still render it.
 4. If the model plugin exists but parsing fails, the host should report a diagnostic and should normally make the source visible unless policy says otherwise.
+
+For an external model directive with `[md:model:NAME]: RESOURCE "INFO-STRING"`:
+
+1. The host resolves and fetches `RESOURCE`.
+2. The title is parsed as a fenced block info string.
+3. The processor conceptually injects `model=NAME` into that info string.
+4. The resource content is processed as the fenced block payload.
+5. If registration succeeds, the model is available in the resolved model repository and no document body content is produced.
+
+For an external model directive without a title, the host follows the parser-selection rules above before processing the resource content as a model payload.
 
 This means:
 
@@ -1625,11 +1714,19 @@ digraph G { A -> B }
 
 registers a model when a DOT model plugin is available.
 
-### 16.5 Model rendering through plugins
+This:
+
+```markdown
+[md:model:system-graph]: shared:models/system.dot "dot"
+```
+
+registers the same kind of model from an external DOT resource when the resource can be fetched and parsed.
+
+### 16.7 Model rendering through plugins
 
 A plugin-owned block may render a model by reading the model repository.
 
-Example:
+Example with an inline model:
 
 ````markdown
 [md:require]: model.dot
@@ -1641,6 +1738,20 @@ digraph G {
   Model -> Report
 }
 ```
+
+```diagram.dot.render source=system-graph
+caption: System graph
+```
+````
+
+Example with an external model resource:
+
+````markdown
+[md:require]: resource
+[md:require]: model.dot
+[md:require]: diagram.dot.render
+
+[md:model:system-graph]: shared:models/system.dot "dot"
 
 ```diagram.dot.render source=system-graph
 caption: System graph
@@ -2101,6 +2212,7 @@ This section is an authoring convention, not a mandatory portable page-building 
 [md:title]: <Architecture Roadmap>
 
 [md:require]: include
+[md:require]: resource
 [md:require]: layout.grid
 [md:require]: diagram.mermaid
 [md:require]: diagram.dot
@@ -2109,6 +2221,7 @@ This section is an authoring convention, not a mandatory portable page-building 
 [md:require]: math.latex
 [md:require]: highlight.typescript
 [md:repository:shared]: ./shared
+[md:model:system-graph]: shared:models/system.dot "dot"
 [md:theme]: shared:themes/company.theme.md
 [md:layout]: shared:layouts/two-columns.layout.md
 
@@ -2142,7 +2255,18 @@ Check consistency.
 
 Produce reusable outputs.
 
-```dot model=system-graph
+```diagram.dot.render source=system-graph
+caption: System graph
+```
+
+A simple formula: $E = mc^2$.
+````
+
+### External model resource
+
+Resource `shared:models/system.dot`:
+
+```dot
 digraph G {
   Source -> Model
   Model -> Report
@@ -2150,13 +2274,6 @@ digraph G {
   Model -> Slides
 }
 ```
-
-```diagram.dot.render source=system-graph
-caption: System graph
-```
-
-A simple formula: $E = mc^2$.
-````
 
 ### Theme resource
 
@@ -2258,6 +2375,11 @@ A processor SHOULD produce diagnostics for:
 | Unavailable repository provider | error |
 | Resource fetch failure | warning or error |
 | Resource request denied by policy | warning or error |
+| Invalid external model directive | error |
+| Invalid external model info string | error |
+| Unsupported external model parser selector | warning or error |
+| External model parser selection failed | warning or error |
+| External model resource parse failure | error |
 | Duplicate explicit anchor | error |
 | Duplicate model name | error |
 | Unknown layout | error |

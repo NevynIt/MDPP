@@ -37,7 +37,7 @@ The CLI should support:
 - nested includes;
 - repository-qualified resources;
 - theme/layout/stylesheet resources;
-- model parsing and model rendering;
+- inline and external model parsing and model rendering;
 - HTML output;
 - PDF output;
 - structured diagnostics;
@@ -253,7 +253,7 @@ Until then, visual editing should be limited to source editing plus rich preview
 5. Basic HTML renderer and source maps.
 6. CLI HTML output.
 7. Plugin registry and plugin manifest validation.
-8. Mermaid, math, syntax highlight, DOT model/render plugins.
+8. Mermaid, math, syntax highlight, DOT inline/external model and render plugins.
 9. Layout interpretation and basic area renderers.
 10. CLI PDF output.
 11. Bundle export/import.

@@ -2,6 +2,7 @@
 [md:profile-version]: 0.15
 [md:title]: <Complete Minimal Document>
 [md:require]: include
+[md:require]: resource
 [md:require]: layout.grid
 [md:require]: diagram.mermaid
 [md:require]: model.dot
@@ -9,6 +10,7 @@
 [md:require]: math.latex
 [md:require]: highlight.core
 [md:repository:shared]: ./shared
+[md:model:system-graph]: shared:models/system.dot "dot"
 [md:theme]: shared:themes/company.theme.md
 [md:layout]: shared:layouts/two-columns.layout.md
 [md:stylesheet]: ./doc.css

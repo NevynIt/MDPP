@@ -67,6 +67,11 @@ Ranges:
 | `MDPP0302` | error | model | Model parser failed |
 | `MDPP0303` | warning | block | Unsupported fenced block required by selected output |
 | `MDPP0304` | warning | plugin | Plugin render failure |
+| `MDPP0305` | error | model | Invalid external model directive |
+| `MDPP0306` | error | model | Invalid external model info string |
+| `MDPP0307` | warning | model | Unsupported external model parser selector |
+| `MDPP0308` | warning | model | External model parser selection failed |
+| `MDPP0309` | error | model | External model resource parse failure |
 | `MDPP0400` | error | theme | Invalid theme resource |
 | `MDPP0401` | error | stylesheet | Invalid stylesheet resource |
 | `MDPP0402` | error | layout | Invalid layout resource |

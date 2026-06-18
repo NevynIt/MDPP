@@ -45,3 +45,7 @@ Examples `71` through `77` cover richer theme declarations, page furniture, and 
 ## Theme-composition fixtures
 
 Example `78` covers v0.15 theme-level `[md:include]` composition. Included files are parsed in theme context and contribute declarations to the including theme at their include positions.
+
+## External-model fixtures
+
+Examples `79` through `86` cover v0.15 external model resources declared with `[md:model:NAME]: RESOURCE "INFO-STRING"`. They exercise successful resource-backed registration, invalid directive titles, invalid info strings, unsupported parser selectors, parser selection failure, resource parse failure, duplicate names, and missing model resources.

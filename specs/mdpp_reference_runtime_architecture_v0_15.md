@@ -534,7 +534,7 @@ A plugin may provide one or more roles:
 | `repository-provider` | Resolves repository roots and provides repository access |
 | `document-type-provider` | Owns parsing, serialization, validation, patching, and semantic access for document types |
 | `transformation-provider` | Converts typed document artifacts into other typed document artifacts |
-| `model-parser` | Parses model blocks into `mdpp.model` artifacts |
+| `model-parser` | Parses inline or external model payloads into `mdpp.model` artifacts |
 | `block-renderer` | Renders fenced blocks or plugin-owned blocks into `mdpp.render-tree` artifacts |
 | `mdpp-renderer` | Renders a resolved md++ document into a render tree and related interactive artifacts |
 | `layout-interpreter` | Maps resolved Markdown fragments, layouts, and presentation context into a page model |
@@ -609,9 +609,9 @@ Path contract for repository-qualified references:
 9. Write, create, move, copy, delete, lock, and watch operations are OPTIONAL and remain subject to host policy.
 10. Write conflicts SHOULD produce diagnostics rather than silently overwriting content. The exact conflict strategy is host-defined.
 
-### 4.3. Plugin resource access
+### 4.3. External model and plugin resource access
 
-The host provides resource access to plugins during parsing and rendering.
+The host provides resource access to the core processor and plugins during parsing and rendering. External model directives use the same resource boundary as plugin-owned resource requests.
 
 A plugin may request a resource using the same repository-qualified reference form:
 
@@ -628,7 +628,9 @@ corporate:themes/company.theme.md
 
 The host resolves the repository name through the global repository table, calls the registered repository provider, applies its own access policy, fetches the content when allowed, and returns either a resource response or an error diagnostic to the plugin.
 
-Relative resource requests should be resolved against the source file that contains the requesting block, unless the plugin or host defines a more specific base.
+Relative resource requests should be resolved against the source file that contains the requesting directive or block, unless the plugin or host defines a more specific base.
+
+For `[md:model:NAME]:` directives, the processor resolves and fetches the resource before model parser dispatch. The directive origin and fetched resource origin should both be preserved in the generated `mdpp.model` artifact and in diagnostics where available.
 
 Plugins should not fetch external resources directly in portable md++ processing. The interaction boundary is the host resource API: plugins ask the host for a resource, and the host either provides it or returns a diagnostic according to host policy.
 
@@ -750,6 +752,7 @@ interface MdRenderDocumentResult {
   snapshot: MdNode;
   state: MdRendererState;
   resources: MdUsedResource[];
+  models?: MdDocument;
   plugins: MdUsedPlugin[];
   sourceMap: MdSourceMap;
   interactions?: MdInteractionBinding[];
@@ -761,7 +764,9 @@ interface MdRenderDocumentResult {
 
 `state` is opaque to the host. The host stores it and passes it back to the renderer for later update, source-location, and worker-action operations.
 
-`resources` records all external resources that contributed to the result, including included files, repository roots, themes, layouts, stylesheets, assets, fonts, plugin-requested resources, and repository-provided content.
+`resources` records all external resources that contributed to the result, including included files, repository roots, themes, layouts, stylesheets, assets, fonts, plugin-requested resources, external model sources, and repository-provided content.
+
+`models`, when present, is the resolved `mdpp.model-repository` artifact, including inline and external model origins.
 
 `plugins` records all plugins selected or used during rendering.
 
@@ -1265,10 +1270,10 @@ Core responsibilities:
 
 - parse Markdown-compatible directives;
 - collect requirements;
-- resolve includes and fetch resources for plugins;
+- resolve includes and fetch resources for external models and plugins;
 - create and pass typed document artifacts between runtime phases;
 - identify fenced blocks and their attributes;
-- recognize `model=NAME`;
+- recognize inline `model=NAME` attributes and external `[md:model:NAME]:` directives;
 - build the model registry when plugins are available;
 - expose the resolved model repository to plugins;
 - process layout declarations where supported;
@@ -1290,7 +1295,7 @@ Plugin and provider responsibilities:
 | Export rendered output to PDF, SVG, PNG, HTML, or another package format | `export.pdf` |
 | Provide authorized interaction behavior | `interaction.diagram` |
 
-The same plugin may provide several roles. The same block language may have both a normal renderer plugin and a model plugin. The presence of `model=NAME` decides whether model absorption is attempted.
+The same plugin may provide several roles. The same parser selector may have both a normal renderer plugin and a model plugin. The presence of `model=NAME` or an external model directive decides whether model absorption is attempted.
 
 ### 6.1. Plugin runtime
 
@@ -1509,6 +1514,7 @@ interface MdSourceOrigin {
   endColumn?: number;
   repository?: string;
   ref?: string;
+  role?: string;
 }
 
 interface MdDiagnostic {
@@ -1517,11 +1523,14 @@ interface MdDiagnostic {
   message: string;
   code?: string;
   origin?: MdSourceOrigin;
+  relatedOrigins?: MdSourceOrigin[];
   file?: string;
   line?: number;
   layout?: string;
   area?: string;
   model?: string;
+  resource?: string;
+  parserSelector?: string;
   capability?: string;
 }
 
@@ -1678,8 +1687,19 @@ interface MdRepositoryResourceRequest {
 
 interface MdModelSummary {
   name: string;
-  language: string;
+  parserSelector: string;
+  language?: string;
+  pipeline?: string;
+  originKind?: "inline" | "external";
   origin?: MdSourceOrigin;
+  directiveOrigin?: MdSourceOrigin;
+  resourceOrigin?: {
+    requestedRef?: string;
+    resolvedRef?: string;
+    mediaType?: string;
+    hash?: MdContentHash;
+    origin?: MdSourceOrigin;
+  };
 }
 
 interface MdModel extends MdModelSummary {
@@ -1690,20 +1710,26 @@ interface MdModel extends MdModelSummary {
 
 interface MdModelParseRequest {
   name: string;
-  language: string;
+  parserSelector: string;
+  language?: string;
   sourceText: string;
   attributes: Record<string, string | boolean>;
   origin?: MdSourceOrigin;
+  directiveOrigin?: MdSourceOrigin;
+  resourceOrigin?: MdModelSummary["resourceOrigin"];
 }
 
 interface MdModelUpdateRequest {
   previousModel?: MdModel;
   name: string;
-  language: string;
+  parserSelector: string;
+  language?: string;
   sourceText: string;
   attributes: Record<string, string | boolean>;
   changes: MdResourceChange[];
   origin?: MdSourceOrigin;
+  directiveOrigin?: MdSourceOrigin;
+  resourceOrigin?: MdModelSummary["resourceOrigin"];
 }
 
 interface MdModelParseResult {
@@ -1785,21 +1811,22 @@ A renderer calls `handleInteraction` on a plugin or handles the interaction itse
 
 ### 6.6. Plugin dispatch and conflict resolution
 
-A host maps repository roots, fenced block types, model languages, area renderers, interaction runtimes, and capabilities to plugins through a deterministic dispatch process.
+A host maps repository roots, fenced block types, model parser selectors, area renderers, interaction runtimes, and capabilities to plugins through a deterministic dispatch process.
 
 Dispatch is phase-specific:
 
 1. A repository directive is first considered for repository provider resolution as defined in the repository provider section of this architecture.
 2. A document artifact is dispatched to a document type provider when parsing, serialization, validation, patching, or semantic access is requested for its document type.
 3. A transformation request is dispatched to a transformation provider when input document types and requested output type match a provider capability.
-4. A fenced block with `model=NAME` is first considered for model parsing by a model plugin for the block language.
-5. If model registration succeeds, the block is absorbed and is not normally rendered at its source position.
-6. If no model plugin is available, the block remains available for normal rendering or fallback display.
-7. A plugin-owned rendering block is dispatched by exact block type, such as `diagram.dot.render`.
-8. An ordinary fenced block is dispatched by its block type or language, such as `mermaid` or `dot`.
-9. An area renderer is dispatched by the declared `renderer` property of the area.
-10. A main-thread plugin action is dispatched by `pluginId` to the authorized main-thread runtime declared by the selected plugin metadata.
-11. A worker action is dispatched to the renderer, which may then dispatch to the worker-side plugin that owns the action or rendered subtree.
+4. An external model directive resolves its resource, parses its optional info string, and is considered for model parsing by a model plugin for the selected parser.
+5. A fenced block with `model=NAME` is considered for model parsing by a model plugin for the parser selector.
+6. If model registration succeeds, the external model directive produces no body output and the inline model block is absorbed.
+7. If no model plugin is available for an inline model block, the block remains available for normal rendering or fallback display.
+8. A plugin-owned rendering block is dispatched by exact block type, such as `diagram.dot.render`.
+9. An ordinary fenced block is dispatched by its block type or language, such as `mermaid` or `dot`.
+10. An area renderer is dispatched by the declared `renderer` property of the area.
+11. A main-thread plugin action is dispatched by `pluginId` to the authorized main-thread runtime declared by the selected plugin metadata.
+12. A worker action is dispatched to the renderer, which may then dispatch to the worker-side plugin that owns the action or rendered subtree.
 
 When multiple plugins can handle the same operation, portable hosts should apply the following priority order:
 
@@ -1822,6 +1849,7 @@ Recommended default dispatch table for a reference implementation:
 | ordinary `mermaid` fenced block | `diagram.mermaid` | Block renderer |
 | ordinary `dot` fenced block | `diagram.dot` | Block renderer or code fallback |
 | `dot model=NAME` | `model.dot` | Model parser; absorbed on successful registration |
+| `[md:model:NAME]` with `dot` selector or `.dot` resource | `model.dot` | External model parser; no body output on successful registration |
 | `diagram.dot.render` block | `diagram.dot.render` | Exact plugin-owned block type |
 | `math.latex` or math spans/blocks | `math.latex` | Math renderer |
 | `renderer` property on layout area | `area-renderer` with matching renderer name | Area rendering is plugin-specific |
@@ -1852,8 +1880,8 @@ A portable md++ processor should use the following conceptual processing order f
 8. collect resolved directives according to their directive scope;
 9. resolve remaining required capabilities against the core processor, host, and available plugins;
 10. load or select document type providers, transformation providers, model parsers, block renderers, validators, layout processors, and presentation providers needed by the document;
-11. identify fenced blocks and parse md++ info-string attributes into `mdpp.fenced-block` artifacts where applicable;
-12. register model blocks into the resolved model repository as `mdpp.model` artifacts;
+11. identify fenced blocks and external model directives, then parse md++ info-string attributes into `mdpp.fenced-block` or model-source artifacts where applicable;
+12. resolve external model resources and register inline and external models into the resolved model repository as `mdpp.model` artifacts;
 13. dispatch plugin-owned rendering blocks and ordinary renderable blocks as transformations over typed artifacts;
 14. resolve themes, layouts, stylesheets, assets, plugin defaults, and explicit token references into an `mdpp.presentation-context` artifact;
 15. build a serializable `mdpp.render-tree` artifact representing the rendered HTML document tree;
@@ -1870,7 +1898,7 @@ A portable md++ renderer should use the following conceptual processing order fo
 1. receive changed resources as whole replacement content, text diffs, binary replacements, or deletion notices;
 2. convert the changes into updated document artifacts or document patches where supported;
 3. match changed resource references against the previous dependency graph in the renderer state;
-4. invalidate affected includes, repositories, models, blocks, layouts, themes, stylesheets, assets, fonts, and plugin outputs;
+4. invalidate affected includes, repositories, external model resources, models, blocks, layouts, themes, stylesheets, assets, fonts, and plugin outputs;
 5. reuse unaffected parse, model, layout, presentation, plugin, and render state where valid;
 6. ask affected document type providers and transformation providers to update their own artifacts, state, and output when they support update hooks;
 7. rerender affected subtrees when plugin update hooks are unavailable or fail safely;

@@ -25,7 +25,7 @@ MDPP/
     SUITE_MANIFEST.md
     01-plain-gfm-document/
     ...
-    70-complete-minimal-document/
+    86-missing-external-model-resource/
 ```
 
 ## Reading order
@@ -63,5 +63,6 @@ The bundle also includes an additive Office-normalization profile:
 - v0.15 sidecar naming guidance for imported comments, review metadata, and import diagnostics;
 - stable diagnostic codes for page furniture and lossy import cases;
 - compliance examples `71` through `78`.
+- external model resource examples `79` through `86`.
 
 <!-- END mdpp-office-pipeline-update-v0-15: readme -->

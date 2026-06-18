@@ -16,13 +16,6 @@ flowchart TD
   Model --> Output
 ```
 
-```dot model=system-graph
-digraph G {
-  Source -> Model
-  Model -> Output
-}
-```
-
 ### Right {.right}
 
 ```diagram.dot.render source=system-graph

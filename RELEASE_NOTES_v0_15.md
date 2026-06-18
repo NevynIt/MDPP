@@ -46,4 +46,6 @@ The DOCX importer and Word exporter prototypes now emit md++ 0.15 roots and root
 
 Theme composition coverage is represented by compliance fixture `78`.
 
+External model resources are represented by diagnostic codes `MDPP0305`-`MDPP0309` and compliance fixtures `79` through `86`.
+
 <!-- END mdpp-office-pipeline-update-v0-15: release-notes -->

@@ -41,6 +41,124 @@
         },
         "ref": {
           "type": "string"
+        },
+        "role": {
+          "type": "string"
+        }
+      }
+    },
+    "MdModelResourceOrigin": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "requestedRef": {
+          "type": "string"
+        },
+        "resolvedRef": {
+          "type": "string"
+        },
+        "mediaType": {
+          "type": "string"
+        },
+        "hash": {
+          "$ref": "#/$defs/MdContentHash"
+        },
+        "origin": {
+          "$ref": "#/$defs/MdSourceOrigin"
+        }
+      }
+    },
+    "MdModelSummary": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "parserSelector": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string"
+        },
+        "pipeline": {
+          "type": "string"
+        },
+        "originKind": {
+          "type": "string",
+          "enum": [
+            "inline",
+            "external"
+          ]
+        },
+        "origin": {
+          "$ref": "#/$defs/MdSourceOrigin"
+        },
+        "directiveOrigin": {
+          "$ref": "#/$defs/MdSourceOrigin"
+        },
+        "resourceOrigin": {
+          "$ref": "#/$defs/MdModelResourceOrigin"
+        }
+      }
+    },
+    "MdModel": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/MdModelSummary"
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "sourceText": {
+              "type": "string"
+            },
+            "parsed": {},
+            "attributes": {
+              "type": "object",
+              "additionalProperties": {
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "boolean"
+                  }
+                ]
+              }
+            },
+            "diagnostics": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/MdDiagnostic"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "MdModelRepository": {
+      "type": "object",
+      "required": [
+        "models"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "models": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MdModel"
+          }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MdDiagnostic"
+          }
         }
       }
     },
@@ -69,6 +187,12 @@
         "origin": {
           "$ref": "#/$defs/MdSourceOrigin"
         },
+        "relatedOrigins": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MdSourceOrigin"
+          }
+        },
         "file": {
           "type": "string"
         },
@@ -83,6 +207,12 @@
           "type": "string"
         },
         "model": {
+          "type": "string"
+        },
+        "resource": {
+          "type": "string"
+        },
+        "parserSelector": {
           "type": "string"
         },
         "capability": {
@@ -777,6 +907,9 @@
           "items": {
             "$ref": "#/$defs/MdUsedResource"
           }
+        },
+        "models": {
+          "$ref": "#/$defs/MdModelRepository"
         },
         "plugins": {
           "type": "array",

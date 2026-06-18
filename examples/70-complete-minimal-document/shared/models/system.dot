@@ -1,0 +1,4 @@
+digraph G {
+  Source -> Model
+  Model -> Output
+}

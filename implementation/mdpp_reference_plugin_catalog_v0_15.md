@@ -111,7 +111,7 @@ These plugins provide the md++ processing pipeline.
 | `mdpp.requirements.resolver` | `mdpp.requirements@1` | directive table | resolved requirements | Parse and resolve capability requirements. |
 | `mdpp.include.resolver` | `include@1` | `mdpp.source` | `mdpp.resolved-tree` | Resolve nested includes and preserve source origins. |
 | `mdpp.resource.resolver` | `resource@1` | resource refs | resources | Resolve relative and repository-qualified resources. |
-| `mdpp.model.registry` | `mdpp.models@1` | model parse results | model repository | Register unique named models. |
+| `mdpp.model.registry` | `mdpp.models@1` | inline and external model parse results | model repository | Register unique named models with inline or resource origins. |
 | `mdpp.presentation.resolver` | `mdpp.presentation@1` | directives/resources | presentation context | Resolve themes, layouts, stylesheets, assets, and plugin defaults. |
 | `mdpp.html.renderer` | `mdpp.render.html@1` | `mdpp.resolved-tree` | `mdpp.render-tree` | Render md++ content to a serializable HTML-compatible tree. |
 | `mdpp.source-map.builder` | `mdpp.source-map@1` | render results | source map | Build node-to-source and source-to-node mappings. |
@@ -142,7 +142,7 @@ The language defines math syntax. Rendering quality and exact supported LaTeX co
 | Plugin id | Capability | Input | Output | Purpose |
 |---|---|---|---|---|
 | `diagram.mermaid` | `diagram.mermaid@1` | Mermaid block source | render tree or SVG | Render Mermaid fenced blocks. |
-| `model.dot` | `model.dot@1` | DOT block source with `model=NAME` | `mdpp.model` | Parse DOT as a named model. |
+| `model.dot` | `model.dot@1` | DOT model payload from an inline block or external resource | `mdpp.model` | Parse DOT as a named model. |
 | `diagram.dot` | `diagram.dot@1` | DOT block source | render tree or SVG | Render ordinary DOT blocks. |
 | `diagram.dot.render` | `diagram.dot.render@1` | model reference + render block | render tree or SVG | Render a named DOT model. |
 
@@ -340,6 +340,7 @@ A reference implementation should use a deterministic default dispatch table.
 | `md:` directives | `mdpp.directive.collector` |
 | `[md:include]:` | `mdpp.include.resolver` |
 | `model=NAME` on `dot` block | `model.dot` |
+| `[md:model:NAME]` with `dot` selector or `.dot` resource | `model.dot` |
 | ordinary `mermaid` block | `diagram.mermaid` |
 | ordinary `dot` block | `diagram.dot` |
 | `diagram.dot.render` block | `diagram.dot.render` |

@@ -1,0 +1,4 @@
+digraph G {
+  External -> Model
+  Model -> Render
+}
