@@ -8,6 +8,7 @@ import {
   numPr,
   paragraphStyleId,
   parseComments,
+  parseNumbering,
   parseXml,
   parseRelationships,
   parseStyles,
@@ -17,7 +18,8 @@ import {
   sectionProperties,
   textOf
 } from "./openxml.js";
-import { escapeMarkdownCell, escapeMarkdownText, mdAttributes, mdClassAttr, slugClassName } from "./markdown.js";
+import { escapeMarkdownCell, escapeMarkdownText, mdAttributes, slugClassName } from "./markdown.js";
+import type { WordNumberingDefinition, WordNumberingLevel } from "./openxml.js";
 import type {
   ImportedCommentAnchor,
   MdppDocxConvertInput,
@@ -26,15 +28,34 @@ import type {
   MdppGeneratedFile,
   MdppImportDiagnostic,
   WordCommentInfo,
+  WordNumberingReference,
   WordStyleInfo
 } from "./types.js";
 
 const EMU_PER_PT = 12700;
 
+interface ParagraphInfo {
+  styleId?: string;
+  style?: WordStyleInfo;
+  styleName?: string;
+  className?: string;
+  semantic: ParagraphSemantic;
+}
+
+type ParagraphSemantic =
+  | { kind: "normal" }
+  | { kind: "heading"; level: number }
+  | { kind: "unordered-list"; level: number }
+  | { kind: "ordered-list"; level: number }
+  | { kind: "quote" }
+  | { kind: "code" }
+  | { kind: "callout"; className: string };
+
 interface ConversionState {
   files: MdppGeneratedFile[];
   diagnostics: MdppImportDiagnostic[];
   styles: Map<string, WordStyleInfo>;
+  numbering: Map<string, WordNumberingDefinition>;
   comments: Map<string, WordCommentInfo>;
   rels: Map<string, { id: string; type: string; target: string; targetMode?: string }>;
   packageEntries: Record<string, Uint8Array>;
@@ -53,6 +74,7 @@ export async function convertDocxToMdpp(input: MdppDocxConvertInput, options: Md
     files: [],
     diagnostics: [],
     styles: parseStyles(pkg.xml("word/styles.xml")),
+    numbering: parseNumbering(pkg.xml("word/numbering.xml")),
     comments: parseComments(pkg.xml("word/comments.xml")),
     rels: parseRelationships(pkg.xml("word/_rels/document.xml.rels")),
     packageEntries: pkg.entries,
@@ -62,7 +84,7 @@ export async function convertDocxToMdpp(input: MdppDocxConvertInput, options: Md
     options: {
       rootFileName: options.rootFileName ?? "root.md",
       includeRawStyleClasses: options.includeRawStyleClasses ?? true,
-      commentAnchorMode: options.commentAnchorMode ?? "span",
+      commentAnchorMode: options.commentAnchorMode ?? "attribute",
       imageBaseName: options.imageBaseName ?? "image",
       emitSimpleMarkdownTables: options.emitSimpleMarkdownTables ?? true,
       ...options
@@ -82,9 +104,28 @@ export async function convertDocxToMdpp(input: MdppDocxConvertInput, options: Md
   lines.push("");
 
   let paragraphIndex = 0;
-  for (const node of children(body)) {
+  const bodyChildren = children(body);
+  for (let i = 0; i < bodyChildren.length; i++) {
+    const node = bodyChildren[i];
     if (localName(node) === "sectPr") continue;
     if (localName(node) === "p") {
+      const info = paragraphInfo(node, state);
+      if (info.semantic.kind === "code") {
+        const codeParagraphs: Element[] = [];
+        let j = i;
+        while (j < bodyChildren.length && localName(bodyChildren[j]) === "p" && paragraphInfo(bodyChildren[j], state).semantic.kind === "code") {
+          codeParagraphs.push(bodyChildren[j]);
+          j++;
+        }
+        const block = codeBlockToMarkdown(codeParagraphs, state, paragraphIndex);
+        paragraphIndex += codeParagraphs.length;
+        i = j - 1;
+        if (block.trim()) {
+          lines.push(block);
+          lines.push("");
+        }
+        continue;
+      }
       const block = paragraphToMarkdown(node, state, paragraphIndex++);
       if (block.trim()) {
         lines.push(block);
@@ -114,31 +155,52 @@ export async function convertDocxToMdpp(input: MdppDocxConvertInput, options: Md
 }
 
 function paragraphToMarkdown(p: Element, state: ConversionState, paragraphIndex: number): string {
+  const info = paragraphInfo(p, state);
+  const anchorIds = commentAnchorIdsForParagraph(p, state, paragraphIndex);
+  const text = inlineContent(p, state).trim();
+  if (!text && !anchorIds.length) return "";
+
+  const attrs = blockAttributes(info, anchorIds, state);
+  switch (info.semantic.kind) {
+    case "heading":
+      return `${"#".repeat(info.semantic.level)} ${text}${attrs ? " " + attrs : ""}`.trim();
+    case "unordered-list":
+      return `${"  ".repeat(info.semantic.level)}- ${text}${attrs ? " " + attrs : ""}`.trimEnd();
+    case "ordered-list":
+      return `${"  ".repeat(info.semantic.level)}1. ${text}${attrs ? " " + attrs : ""}`.trimEnd();
+    case "quote":
+      return `> ${text}${attrs ? " " + attrs : ""}`.trimEnd();
+    case "callout":
+      return `${text}${attrs ? " " + attrs : ""}`.trim();
+    default:
+      return `${text}${attrs ? " " + attrs : ""}`.trim();
+  }
+}
+
+function paragraphInfo(p: Element, state: ConversionState): ParagraphInfo {
   const styleId = paragraphStyleId(p);
   const style = styleId ? state.styles.get(styleId) : undefined;
   const styleName = style?.name ?? styleId;
   const className = slugClassName(styleName);
-  if (className) state.usedStyleClasses.add(className);
-
-  const commentPrefix = commentAnchorsForParagraph(p, state, paragraphIndex);
-  const text = inlineContent(p, state).trim();
-  if (!text && !commentPrefix) return "";
 
   const headingLevel = headingLevelFromStyle(styleName ?? styleId);
-  if (headingLevel) {
-    return `${"#".repeat(headingLevel)} ${commentPrefix}${text}${className ? " " + mdClassAttr(className) : ""}`.trim();
+  if (headingLevel) return { styleId, style, styleName, className, semantic: { kind: "heading", level: headingLevel } };
+
+  const numbering = resolveParagraphNumbering(p, state, styleId);
+  if (numbering?.level?.format) {
+    const kind = numbering.level.format === "bullet" ? "unordered-list" : "ordered-list";
+    return { styleId, style, styleName, className, semantic: { kind, level: numbering.markdownLevel } };
   }
 
-  const list = numPr(p);
-  if (list?.numId) {
-    const indent = "  ".repeat(Math.max(0, list.level ?? 0));
-    return `${indent}- ${commentPrefix}${text}${className ? " " + mdClassAttr(className) : ""}`.trimEnd();
-  }
+  const styleKey = `${styleId ?? ""} ${styleName ?? ""} ${className ?? ""}`;
+  if (/\bquote\b/i.test(styleKey)) return { styleId, style, styleName, className, semantic: { kind: "quote" } };
+  if (/\bcode\b/i.test(styleKey)) return { styleId, style, styleName, className, semantic: { kind: "code" } };
+  if (/\bcallout-warning\b/i.test(styleKey)) return { styleId, style, styleName, className, semantic: { kind: "callout", className: "callout-warning" } };
 
-  return `${commentPrefix}${text}${className ? " " + mdClassAttr(className) : ""}`.trim();
+  return { styleId, style, styleName, className, semantic: { kind: "normal" } };
 }
 
-function commentAnchorsForParagraph(p: Element, state: ConversionState, paragraphIndex: number): string {
+function commentAnchorIdsForParagraph(p: Element, state: ConversionState, paragraphIndex: number): string[] {
   const ids = new Set<string>();
   for (const el of descendants(p, "commentRangeStart")) {
     const id = attr(el, "id");
@@ -148,15 +210,64 @@ function commentAnchorsForParagraph(p: Element, state: ConversionState, paragrap
     const id = attr(el, "id");
     if (id) ids.add(id);
   }
-  const markers: string[] = [];
+  const anchorIds: string[] = [];
   for (const id of ids) {
     const anchorId = `word-comment-${id}`;
     state.commentAnchors.push({ id: anchorId, commentId: id, paragraphIndex });
-    if (state.options.commentAnchorMode === "span") {
-      markers.push(`<span id="${anchorId}" class="word-comment-anchor"></span>`);
-    }
+    if (state.options.commentAnchorMode === "attribute") anchorIds.push(anchorId);
   }
-  return markers.join("");
+  return anchorIds;
+}
+
+function blockAttributes(info: ParagraphInfo, anchorIds: string[], state: ConversionState): string {
+  const attrs: Record<string, string | number | boolean | undefined> = {};
+  for (const anchorId of anchorIds) attrs[`#${anchorId}`] = true;
+  if (info.semantic.kind === "callout") attrs[`.${info.semantic.className}`] = true;
+  if (info.semantic.kind === "callout") state.usedStyleClasses.add(info.semantic.className);
+  if (shouldEmitRawStyleClass(info) && info.className) {
+    attrs[`.${info.className}`] = true;
+    state.usedStyleClasses.add(info.className);
+  }
+  return mdAttributes(attrs);
+}
+
+function shouldEmitRawStyleClass(info: ParagraphInfo): boolean {
+  return info.semantic.kind === "normal" || info.semantic.kind === "callout";
+}
+
+function resolveParagraphNumbering(p: Element, state: ConversionState, styleId?: string): { ref: WordNumberingReference; definition?: WordNumberingDefinition; level?: WordNumberingLevel; markdownLevel: number } | undefined {
+  const ref = numPr(p) ?? inheritedStyleNumbering(styleId, state);
+  if (!ref?.numId) return undefined;
+  const definition = state.numbering.get(ref.numId);
+  const levelIndex = ref.level ?? 0;
+  const level = definition?.levels.get(levelIndex) ?? firstNumberingLevel(definition);
+  return { ref, definition, level, markdownLevel: markdownListLevel(ref, level) };
+}
+
+function inheritedStyleNumbering(styleId: string | undefined, state: ConversionState, seen = new Set<string>()): WordNumberingReference | undefined {
+  if (!styleId || seen.has(styleId)) return undefined;
+  seen.add(styleId);
+  const style = state.styles.get(styleId);
+  return style?.numbering ?? inheritedStyleNumbering(style?.basedOn, state, seen);
+}
+
+function firstNumberingLevel(definition: WordNumberingDefinition | undefined): WordNumberingLevel | undefined {
+  return definition ? [...definition.levels.values()].sort((a, b) => a.level - b.level)[0] : undefined;
+}
+
+function markdownListLevel(ref: WordNumberingReference, level: WordNumberingLevel | undefined): number {
+  if (ref.level != null && ref.level > 0) return ref.level;
+  if (level?.leftTwips && level.leftTwips > 360) return Math.max(0, Math.round(level.leftTwips / 360) - 1);
+  return 0;
+}
+
+function codeBlockToMarkdown(paragraphs: Element[], state: ConversionState, firstParagraphIndex: number): string {
+  const lines = paragraphs.map(p => textOf(p).trim());
+  for (let i = 0; i < paragraphs.length; i++) commentAnchorIdsForParagraph(paragraphs[i], state, firstParagraphIndex + i);
+  const first = lines[0] ?? "";
+  const last = lines[lines.length - 1] ?? "";
+  if (first.startsWith("```") && last === "```") return [first, ...lines.slice(1, -1), last].join("\n");
+  return ["```", ...lines, "```"].join("\n");
 }
 
 function inlineContent(parent: Element, state: ConversionState): string {
@@ -286,8 +397,8 @@ function tableToMarkdown(tbl: Element, state: ConversionState): string {
   const matrix = rows.map(row => children(row, "tc").map(cell => cellText(cell, state)));
   const maxCols = Math.max(0, ...matrix.map(r => r.length));
   if (!state.options.emitSimpleMarkdownTables || maxCols === 0) {
-    state.diagnostics.push({ code: "MDPP0417", severity: "warning", message: "Complex table emitted as raw HTML fallback.", wordPart: "word/document.xml" });
-    return "<table>" + matrix.map(r => `<tr>${r.map(c => `<td>${escapeHtml(c)}</td>`).join("")}</tr>`).join("") + "</table>";
+    state.diagnostics.push({ code: "MDPP0417", severity: "warning", message: "Table could not be represented as a Markdown table and was emitted as plain text rows.", wordPart: "word/document.xml" });
+    return matrix.map(row => row.filter(Boolean).join(" | ")).filter(Boolean).join("\n");
   }
   const padded = matrix.map(r => [...r, ...Array(Math.max(0, maxCols - r.length)).fill("")]);
   const header = padded[0] || Array(maxCols).fill("");
@@ -486,10 +597,6 @@ function escapeDirectiveValue(text: string): string {
 
 function normalizeInlineSpacing(text: string): string {
   return text.replace(/\u00a0/g, " ").replace(/[ \t]+\n/g, "\n");
-}
-
-function escapeHtml(text: string): string {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function yamlText(text: string): string {

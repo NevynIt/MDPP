@@ -9,7 +9,7 @@ export interface MdppDocxConvertOptions {
   title?: string;
   rootFileName?: string;
   includeRawStyleClasses?: boolean;
-  commentAnchorMode?: "span" | "none";
+  commentAnchorMode?: "attribute" | "none";
   imageBaseName?: string;
   emitSimpleMarkdownTables?: boolean;
 }
@@ -46,6 +46,7 @@ export interface WordStyleInfo {
   type?: string;
   name?: string;
   basedOn?: string;
+  numbering?: WordNumberingReference;
 }
 
 export interface WordCommentInfo {
@@ -59,4 +60,9 @@ export interface ImportedCommentAnchor {
   id: string;
   commentId: string;
   paragraphIndex: number;
+}
+
+export interface WordNumberingReference {
+  numId?: string;
+  level?: number;
 }

@@ -5,7 +5,7 @@ export function escapeMarkdownText(text: string): string {
 }
 
 export function escapeMarkdownCell(text: string): string {
-  return escapeMarkdownText(text).replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>");
+  return escapeMarkdownText(text).replace(/\|/g, "\\|").replace(/\s*\r?\n\s*/g, " / ");
 }
 
 export function slugClassName(input: string | undefined, prefix = "word-style"): string | undefined {

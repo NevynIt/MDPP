@@ -1,6 +1,6 @@
 import { unzipSync } from "fflate";
 import { DOMParser } from "@xmldom/xmldom";
-import type { OpenXmlRelationship, WordCommentInfo, WordStyleInfo } from "./types.js";
+import type { OpenXmlRelationship, WordCommentInfo, WordNumberingReference, WordStyleInfo } from "./types.js";
 
 const decoder = new TextDecoder("utf-8");
 
@@ -138,13 +138,69 @@ export function parseStyles(doc: Document | undefined): Map<string, WordStyleInf
     if (!styleId) continue;
     const name = attr(firstChild(style, "name"), "val");
     const basedOn = attr(firstChild(style, "basedOn"), "val");
+    const pPr = firstChild(style, "pPr");
     map.set(styleId, {
       styleId,
       type: attr(style, "type"),
       name,
-      basedOn
+      basedOn,
+      numbering: pPr ? parseNumPr(pPr) : undefined
     });
   }
+  return map;
+}
+
+export interface WordNumberingLevel {
+  level: number;
+  format?: string;
+  text?: string;
+  styleId?: string;
+  leftTwips?: number;
+  hangingTwips?: number;
+}
+
+export interface WordNumberingDefinition {
+  numId: string;
+  abstractNumId?: string;
+  levels: Map<number, WordNumberingLevel>;
+}
+
+export function parseNumbering(doc: Document | undefined): Map<string, WordNumberingDefinition> {
+  const map = new Map<string, WordNumberingDefinition>();
+  if (!doc) return map;
+
+  const abstracts = new Map<string, Map<number, WordNumberingLevel>>();
+  for (const abstractNum of descendants(doc, "abstractNum")) {
+    const abstractNumId = attr(abstractNum, "abstractNumId");
+    if (!abstractNumId) continue;
+    const levels = new Map<number, WordNumberingLevel>();
+    for (const lvl of children(abstractNum, "lvl")) {
+      const level = Number(attr(lvl, "ilvl") ?? 0);
+      const pPr = firstChild(lvl, "pPr");
+      const ind = firstChild(pPr, "ind");
+      levels.set(level, {
+        level,
+        format: attr(firstChild(lvl, "numFmt"), "val"),
+        text: attr(firstChild(lvl, "lvlText"), "val"),
+        styleId: attr(firstChild(lvl, "pStyle"), "val"),
+        leftTwips: numberAttr(ind, "left"),
+        hangingTwips: numberAttr(ind, "hanging")
+      });
+    }
+    abstracts.set(abstractNumId, levels);
+  }
+
+  for (const num of children(firstChild(doc, "numbering"), "num")) {
+    const numId = attr(num, "numId");
+    if (!numId) continue;
+    const abstractNumId = attr(firstChild(num, "abstractNumId"), "val");
+    map.set(numId, {
+      numId,
+      abstractNumId,
+      levels: new Map(abstractNumId ? abstracts.get(abstractNumId) : undefined)
+    });
+  }
+
   return map;
 }
 
@@ -176,11 +232,22 @@ export function runHasProperty(r: Element, propName: string): boolean {
 
 export function numPr(p: Element): { numId?: string; level?: number } | undefined {
   const pPr = firstChild(p, "pPr");
-  const np = pPr ? firstChild(pPr, "numPr") : undefined;
+  return pPr ? parseNumPr(pPr) : undefined;
+}
+
+function parseNumPr(pPr: Element): WordNumberingReference | undefined {
+  const np = firstChild(pPr, "numPr");
   if (!np) return undefined;
   const numId = attr(firstChild(np, "numId"), "val");
   const levelRaw = attr(firstChild(np, "ilvl"), "val");
   return { numId, level: levelRaw == null ? undefined : Number(levelRaw) };
+}
+
+function numberAttr(el: Element | undefined, name: string): number | undefined {
+  const value = attr(el, name);
+  if (value == null) return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
 }
 
 export function sectionProperties(document: Document): Element | undefined {
